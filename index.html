@@ -1,708 +1,195 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8">
-<title>Hand Tracking 3D</title>
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;600&display=swap');
-  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-  :root { --cyan:#00ffe7; --mag:#ff00aa; --red:#ff3355; --green:#00ff88; --dark:#050a0f; }
-
-  body { background:var(--dark); color:var(--cyan); font-family:'Share Tech Mono',monospace; overflow:hidden; height:100vh; width:100vw; }
-
-  /* bg-grid: CSS only, no JS cost */
-  body::before { content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
-    background-image: linear-gradient(rgba(0,255,231,0.04) 1px,transparent 1px), linear-gradient(90deg,rgba(0,255,231,0.04) 1px,transparent 1px);
-    background-size:40px 40px; }
-
-  #c { position:fixed; inset:0; z-index:1; }
-
-  #video { position:fixed; bottom:16px; right:16px; width:180px; height:135px;
-    border:1px solid rgba(0,255,231,0.25); border-radius:3px; z-index:10;
-    object-fit:cover; transform:scaleX(-1); opacity:0.65; }
-  #video.hidden  { opacity:0; pointer-events:none; }
-  #video.rec-on  { border-color:var(--red); }
-
-  /* Top bar */
-  #top { position:fixed; top:0; left:0; right:0; z-index:10; display:flex; align-items:flex-start; justify-content:space-between; padding:16px 22px; pointer-events:none; }
-  #title { font-family:'Rajdhani',sans-serif; font-weight:600; font-size:20px; letter-spacing:6px; text-transform:uppercase; color:var(--cyan); text-shadow:0 0 16px var(--cyan); }
-  #title span { color:var(--mag); text-shadow:0 0 16px var(--mag); }
-  #status-panel { font-size:10px; line-height:1.9; color:rgba(0,255,231,0.5); text-align:right; }
-  .dot { display:inline-block; width:5px; height:5px; border-radius:50%; background:#333; margin-right:5px; vertical-align:middle; }
-  .dot.on  { background:var(--cyan); box-shadow:0 0 6px var(--cyan); animation:blink 1.2s ease-in-out infinite; }
-  .dot.red { background:var(--red);  box-shadow:0 0 6px var(--red);  animation:blink 0.7s ease-in-out infinite; }
-  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.25} }
-
-  /* FPS */
-  #fps { position:fixed; top:16px; left:50%; transform:translateX(-50%);
-    z-index:20; font-size:13px; letter-spacing:2px; pointer-events:none; color:rgba(0,255,231,0.3); }
-  #fps.good { color:var(--green); } #fps.mid { color:#ffcc00; } #fps.bad { color:var(--red); }
-
-  /* Settings button — no backdrop-filter (expensive!) */
-  #sbtn { position:fixed; top:44px; left:50%; transform:translateX(-50%); z-index:20;
-    background:rgba(5,14,20,0.9); border:1px solid rgba(0,255,231,0.2);
-    color:rgba(0,255,231,0.45); font-family:'Share Tech Mono',monospace;
-    font-size:10px; letter-spacing:3px; padding:6px 18px;
-    cursor:pointer; text-transform:uppercase; transition:all .2s; white-space:nowrap; }
-  #sbtn:hover  { border-color:var(--cyan); color:var(--cyan); }
-  #sbtn.open   { border-color:var(--mag);  color:var(--mag); }
-
-  /* Settings panel — NO backdrop-filter */
-  #spanel { position:fixed; top:80px; left:50%; transform:translateX(-50%); z-index:19; width:320px;
-    background:rgba(4,11,16,0.97); border:1px solid rgba(0,255,231,0.12);
-    overflow:hidden; max-height:0; transition:max-height .35s cubic-bezier(.4,0,.2,1); }
-  #spanel.open { max-height:650px; border-color:rgba(0,255,231,0.22); }
-  .pi { padding:14px 20px 20px; }
-  .ps { margin-bottom:18px; }
-  .ps:last-child { margin-bottom:0; }
-  .sl { font-size:9px; letter-spacing:4px; color:rgba(0,255,231,0.28); text-transform:uppercase;
-    margin-bottom:9px; border-bottom:1px solid rgba(0,255,231,0.06); padding-bottom:5px; }
-  .or { display:flex; align-items:center; justify-content:space-between; padding:4px 0; cursor:pointer; }
-  .or:hover .ol { color:rgba(0,255,231,0.85); }
-  .ol { font-size:10px; letter-spacing:2px; color:rgba(0,255,231,0.45); text-transform:uppercase; user-select:none; transition:color .12s; }
-  .tog { position:relative; width:36px; height:19px; flex-shrink:0; }
-  .tog input { opacity:0; width:0; height:0; }
-  .tt { position:absolute; inset:0; background:rgba(0,255,231,0.05); border:1px solid rgba(0,255,231,0.16);
-    border-radius:10px; cursor:pointer; transition:background .18s,border-color .18s; }
-  .tt::after { content:''; position:absolute; top:3px; left:3px; width:11px; height:11px; border-radius:50%;
-    background:rgba(0,255,231,0.25); transition:transform .2s,background .18s; }
-  .tog input:checked + .tt { background:rgba(0,255,231,0.1); border-color:var(--cyan); }
-  .tog input:checked + .tt::after { transform:translateX(17px); background:var(--cyan); box-shadow:0 0 6px var(--cyan); }
-  .sr { padding:4px 0; }
-  .sh { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:7px; }
-  .sll { font-size:10px; letter-spacing:2px; color:rgba(0,255,231,0.45); text-transform:uppercase; }
-  .sv { font-size:10px; color:var(--cyan); min-width:34px; text-align:right; font-weight:bold; }
-  .sw { position:relative; height:16px; display:flex; align-items:center; }
-  .st { position:absolute; left:0; right:0; height:2px; background:rgba(0,255,231,0.07); border-radius:1px; }
-  .sf { position:absolute; left:0; height:2px; background:linear-gradient(90deg,var(--cyan),var(--mag)); border-radius:1px; box-shadow:0 0 5px rgba(0,255,231,0.3); pointer-events:none; }
-  input[type=range] { -webkit-appearance:none; position:relative; width:100%; height:16px; background:transparent; cursor:pointer; margin:0; }
-  input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:13px; height:13px; border-radius:50%; background:var(--dark); border:2px solid var(--cyan); box-shadow:0 0 7px var(--cyan); }
-  input[type=range]:hover::-webkit-slider-thumb { transform:scale(1.2); }
-  input[type=range]::-moz-range-thumb { width:13px; height:13px; border-radius:50%; background:var(--dark); border:2px solid var(--cyan); cursor:pointer; }
-
-  /* Record panel — NO backdrop-filter */
-  #rpanel { position:fixed; bottom:44px; left:20px; z-index:20; width:250px;
-    background:rgba(4,11,16,0.97); border:1px solid rgba(0,255,231,0.14); }
-  #rh { display:flex; align-items:center; justify-content:space-between; padding:9px 13px; border-bottom:1px solid rgba(0,255,231,0.07); }
-  #rt { font-size:10px; letter-spacing:4px; color:rgba(0,255,231,0.45); text-transform:uppercase; }
-  #rs { display:flex; align-items:center; gap:5px; font-size:10px; letter-spacing:2px; }
-  #rd { width:7px; height:7px; border-radius:50%; background:#333; }
-  #rd.recording { background:var(--red); box-shadow:0 0 8px var(--red); animation:blink .7s ease-in-out infinite; }
-  #rd.ready     { background:var(--green); box-shadow:0 0 6px var(--green); }
-  #rb { padding:11px 13px 13px; }
-  #dr { display:flex; gap:5px; margin-bottom:10px; }
-  .db { flex:1; padding:4px 0; text-align:center; border:1px solid rgba(0,255,231,0.13); background:transparent; color:rgba(0,255,231,0.38); font-family:'Share Tech Mono',monospace; font-size:10px; cursor:pointer; transition:all .12s; }
-  .db:hover  { border-color:rgba(0,255,231,0.4); color:rgba(0,255,231,0.75); }
-  .db.active { border-color:var(--cyan); color:var(--cyan); background:rgba(0,255,231,0.05); }
-  #rpw { height:2px; background:rgba(0,255,231,0.07); margin-bottom:9px; overflow:hidden; }
-  #rpb { height:100%; width:0%; background:linear-gradient(90deg,var(--red),var(--mag)); transition:width .1s linear; }
-  #ri { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px; }
-  #rtimer { font-size:20px; letter-spacing:2px; color:rgba(0,255,231,0.28); }
-  #rtimer.active { color:var(--red); text-shadow:0 0 14px var(--red); }
-  #rfi { font-size:9px; color:rgba(0,255,231,0.28); letter-spacing:2px; text-align:right; line-height:1.7; }
-  .rbtn { width:100%; padding:8px 0; font-family:'Share Tech Mono',monospace; font-size:10px; letter-spacing:4px; cursor:pointer; text-transform:uppercase; transition:all .18s; margin-bottom:6px; background:transparent; }
-  #recbtn { border:1px solid rgba(255,51,85,0.38); color:rgba(255,51,85,0.65); }
-  #recbtn:hover:not(:disabled) { border-color:var(--red); color:var(--red); }
-  #recbtn.stop { border-color:var(--red); color:var(--red); }
-  #expbtn { border:1px solid rgba(0,255,136,0.38); color:rgba(0,255,136,0.65); display:none; }
-  #expbtn.visible { display:block; }
-  #expbtn:hover { border-color:var(--green); color:var(--green); }
-  #rhint { margin-top:6px; font-size:8px; letter-spacing:1px; color:rgba(0,255,231,0.18); text-align:center; line-height:1.7; }
-
-  /* Export modal */
-  #emodal { position:fixed; inset:0; z-index:50; background:rgba(5,10,15,0.85); display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity .25s; }
-  #emodal.visible { opacity:1; pointer-events:all; }
-  #ebox { width:440px; background:rgba(4,12,18,0.99); border:1px solid rgba(0,255,136,0.28); padding:26px 28px 22px; }
-  #ebox h2 { font-family:'Rajdhani',sans-serif; font-size:17px; letter-spacing:6px; color:var(--green); margin-bottom:5px; }
-  #ebox p { font-size:9px; letter-spacing:2px; color:rgba(0,255,231,0.35); margin-bottom:18px; line-height:1.8; }
-  .es { display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px solid rgba(0,255,231,0.05); font-size:10px; }
-  .es span:first-child { color:rgba(0,255,231,0.38); letter-spacing:2px; }
-  .es span:last-child  { color:var(--cyan); }
-  .ma { display:flex; gap:9px; margin-top:18px; }
-  .mb { flex:1; padding:9px 0; text-align:center; border:1px solid; font-family:'Share Tech Mono',monospace; font-size:10px; letter-spacing:3px; cursor:pointer; text-transform:uppercase; transition:all .18s; background:transparent; }
-  .mb.p { border-color:rgba(0,255,136,0.45); color:var(--green); }
-  .mb.p:hover { background:rgba(0,255,136,0.07); }
-  .mb.s { border-color:rgba(0,255,231,0.18); color:rgba(0,255,231,0.38); }
-  .mb.s:hover { border-color:rgba(0,255,231,0.5); color:var(--cyan); }
-  .fl { margin:12px 0 0; }
-  .fi { display:flex; align-items:center; gap:9px; padding:6px 9px; background:rgba(0,255,231,0.02); border:1px solid rgba(0,255,231,0.06); margin-bottom:4px; }
-  .fn { font-size:10px; color:rgba(0,255,231,0.65); }
-  .fd { font-size:8px; color:rgba(0,255,231,0.28); margin-top:1px; }
-
-  #bar { position:fixed; bottom:0; left:0; right:0; padding:10px 22px; font-size:9px; color:rgba(0,255,231,0.28); display:flex; gap:24px; z-index:10; border-top:1px solid rgba(0,255,231,0.05); letter-spacing:2px; text-transform:uppercase; }
-
-  /* Loading */
-  #ls { position:fixed; inset:0; z-index:100; background:var(--dark); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; transition:opacity .7s; }
-  #ls.hidden { opacity:0; pointer-events:none; }
-  .lt { font-family:'Rajdhani',sans-serif; font-size:26px; font-weight:600; letter-spacing:10px; color:var(--cyan); text-shadow:0 0 28px var(--cyan); }
-  .lbw { width:260px; height:2px; background:rgba(0,255,231,0.09); border-radius:2px; overflow:hidden; }
-  .lb { height:100%; width:0%; background:linear-gradient(90deg,var(--cyan),var(--mag)); transition:width .25s; }
-  .lm { font-size:10px; color:rgba(0,255,231,0.45); letter-spacing:3px; }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hand Tracking 3D</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/ui.css">
+  <link rel="stylesheet" href="css/settings.css">
+  <link rel="stylesheet" href="css/record.css">
+  <link rel="stylesheet" href="css/modal.css">
 </head>
 <body>
 
-<div id="ls">
-  <div class="lt">HAND.TRACK</div>
-  <div class="lbw"><div class="lb" id="lb"></div></div>
-  <div class="lm" id="lm">INITIALIZING...</div>
-</div>
-
-<canvas id="c"></canvas>
-<video id="video" autoplay muted playsinline></video>
-
-<div id="top">
-  <div id="title">HAND<span>.</span>TRACK <span>3D</span></div>
-  <div id="status-panel">
-    <div><span class="dot" id="d-cam"></span>CAMERA</div>
-    <div><span class="dot" id="d-mp"></span>MEDIAPIPE</div>
-    <div><span class="dot" id="d-hand"></span>HAND DETECTED</div>
-    <div id="d-status">LOADING...</div>
+  <!-- ─── Loading screen ─────────────────────────────────────────── -->
+  <div id="ls">
+    <div class="lt">HAND.TRACK</div>
+    <div class="lbw"><div class="lb" id="lb"></div></div>
+    <div class="lm" id="lm">INITIALIZING...</div>
   </div>
-</div>
 
-<div id="fps">-- FPS</div>
+  <!-- ─── Canvas + video feed ────────────────────────────────────── -->
+  <canvas id="c"></canvas>
+  <video id="video" autoplay muted playsinline></video>
 
-<button id="sbtn">⚙ SETTINGS</button>
-<div id="spanel">
-  <div class="pi">
-    <div class="ps">
-      <div class="sl">Motion</div>
-      <div class="sr">
-        <div class="sh"><span class="sll">Smoothing</span><span class="sv" id="sv-sm">LOW</span></div>
-        <div class="sw"><div class="st"></div><div class="sf" id="sf-sm" style="width:18%"></div><input type="range" id="sl-sm" min="0.02" max="1.0" step="0.01" value="0.18"></div>
+  <!-- ─── Top UI ──────────────────────────────────────────────────── -->
+  <header id="top">
+    <div id="title">HAND<span class="acc">.</span>TRACK <span class="acc">3D</span></div>
+    <div id="status-panel">
+      <div><span class="dot" id="d-cam"></span>CAMERA</div>
+      <div><span class="dot" id="d-mp"></span>MEDIAPIPE</div>
+      <div><span class="dot" id="d-hand"></span>HAND DETECTED</div>
+      <div id="d-status">LOADING...</div>
+    </div>
+  </header>
+
+  <div id="fps">-- FPS</div>
+
+  <!-- ─── Settings ───────────────────────────────────────────────── -->
+  <button id="sbtn" aria-label="Toggle settings">⚙ SETTINGS</button>
+
+  <div id="spanel" role="dialog" aria-label="Settings">
+    <div class="pi">
+
+      <section class="ps">
+        <h3 class="sl">Motion</h3>
+        <div class="sr">
+          <div class="sh">
+            <span class="sll">Smoothing</span>
+            <span class="sv" id="sv-sm">LOW</span>
+          </div>
+          <div class="sw">
+            <div class="st"></div>
+            <div class="sf" id="sf-sm" style="width:18%"></div>
+            <input type="range" id="sl-sm" min="0.02" max="1.0" step="0.01" value="0.18" aria-label="Smoothing">
+          </div>
+        </div>
+        <div class="sr" style="margin-top:9px">
+          <div class="sh">
+            <span class="sll">Scale</span>
+            <span class="sv" id="sv-sc">1.20</span>
+          </div>
+          <div class="sw">
+            <div class="st"></div>
+            <div class="sf" id="sf-sc" style="width:35%"></div>
+            <input type="range" id="sl-sc" min="0.5" max="2.5" step="0.05" value="1.20" aria-label="Scale">
+          </div>
+        </div>
+      </section>
+
+      <section class="ps">
+        <h3 class="sl">Visibility</h3>
+        <label class="or"><span class="ol">Joints</span>
+          <span class="tog"><input type="checkbox" id="t-jo" checked><span class="tt"></span></span>
+        </label>
+        <label class="or"><span class="ol">Bones</span>
+          <span class="tog"><input type="checkbox" id="t-bo" checked><span class="tt"></span></span>
+        </label>
+        <label class="or"><span class="ol">Fingertip Highlights</span>
+          <span class="tog"><input type="checkbox" id="t-ti" checked><span class="tt"></span></span>
+        </label>
+        <label class="or"><span class="ol">Particles</span>
+          <span class="tog"><input type="checkbox" id="t-pa" checked><span class="tt"></span></span>
+        </label>
+        <label class="or"><span class="ol">Camera Feed</span>
+          <span class="tog"><input type="checkbox" id="t-ca" checked><span class="tt"></span></span>
+        </label>
+      </section>
+
+      <section class="ps">
+        <h3 class="sl">Effects</h3>
+        <label class="or"><span class="ol">Pulse Animation</span>
+          <span class="tog"><input type="checkbox" id="t-pu" checked><span class="tt"></span></span>
+        </label>
+        <label class="or"><span class="ol">Wireframe Bones</span>
+          <span class="tog"><input type="checkbox" id="t-wi"><span class="tt"></span></span>
+        </label>
+      </section>
+
+      <section class="ps">
+        <h3 class="sl">Performance</h3>
+        <div class="sr">
+          <div class="sh">
+            <span class="sll">MediaPipe Rate</span>
+            <span class="sv" id="sv-mp">20fps</span>
+          </div>
+          <div class="sw">
+            <div class="st"></div>
+            <div class="sf" id="sf-mp" style="width:37%"></div>
+            <input type="range" id="sl-mp" min="5" max="30" step="1" value="20" aria-label="MediaPipe rate">
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <!-- ─── Record panel ────────────────────────────────────────────── -->
+  <aside id="rpanel">
+    <div id="rh">
+      <span id="rt">● RECORD</span>
+      <span id="rs"><span id="rd"></span><span id="rst">READY</span></span>
+    </div>
+    <div id="rb">
+      <div id="dr">
+        <button class="db active" data-sec="5">5s</button>
+        <button class="db" data-sec="10">10s</button>
+        <button class="db" data-sec="15">15s</button>
+        <button class="db" data-sec="30">30s</button>
+        <button class="db" data-sec="0">∞</button>
       </div>
-      <div class="sr" style="margin-top:9px">
-        <div class="sh"><span class="sll">Scale</span><span class="sv" id="sv-sc">1.20</span></div>
-        <div class="sw"><div class="st"></div><div class="sf" id="sf-sc" style="width:35%"></div><input type="range" id="sl-sc" min="0.5" max="2.5" step="0.05" value="1.20"></div>
+      <div id="rpw"><div id="rpb"></div></div>
+      <div id="ri">
+        <div id="rtimer">00:00</div>
+        <div id="rfi">
+          <div id="rfc">0 FRAMES</div>
+          <div id="rfps">~ fps</div>
+        </div>
+      </div>
+      <button class="rbtn" id="recbtn">⏺ START RECORDING</button>
+      <button class="rbtn" id="expbtn">⬇ EXPORT FOR BLENDER</button>
+      <p id="rhint">Render: 60fps | MediaPipe: adjustable<br>Exports ZIP with Blender .py script</p>
+    </div>
+  </aside>
+
+  <!-- ─── Export modal ────────────────────────────────────────────── -->
+  <div id="emodal" role="dialog" aria-modal="true" aria-label="Export">
+    <div id="ebox">
+      <h2>EXPORT READY</h2>
+      <p>ZIP CONTAINS JSON + BLENDER PYTHON SCRIPT.<br>DRAG .PY INTO SCRIPTING EDITOR AND RUN IT.</p>
+      <dl>
+        <div class="es"><dt>DURATION</dt><dd id="ex-d">-</dd></div>
+        <div class="es"><dt>FRAMES</dt><dd id="ex-f">-</dd></div>
+        <div class="es"><dt>FPS</dt><dd id="ex-fps">-</dd></div>
+        <div class="es"><dt>LANDMARKS</dt><dd>21 / frame</dd></div>
+      </dl>
+      <ul class="fl">
+        <li class="fi">
+          <span>📄</span>
+          <div><div class="fn">hand_animation.json</div><div class="fd">Positions + timestamps</div></div>
+        </li>
+        <li class="fi">
+          <span>🐍</span>
+          <div><div class="fn">import_hand_blender.py</div><div class="fd">Run in Blender → keyframed empties</div></div>
+        </li>
+      </ul>
+      <div class="ma">
+        <button class="mb p" id="dlbtn">⬇ DOWNLOAD ZIP</button>
+        <button class="mb s" id="closebtn">CLOSE</button>
       </div>
     </div>
-    <div class="ps">
-      <div class="sl">Visibility</div>
-      <label class="or"><span class="ol">Joints</span><span class="tog"><input type="checkbox" id="t-jo" checked><span class="tt"></span></span></label>
-      <label class="or"><span class="ol">Bones</span><span class="tog"><input type="checkbox" id="t-bo" checked><span class="tt"></span></span></label>
-      <label class="or"><span class="ol">Fingertip Highlights</span><span class="tog"><input type="checkbox" id="t-ti" checked><span class="tt"></span></span></label>
-      <label class="or"><span class="ol">Particles</span><span class="tog"><input type="checkbox" id="t-pa" checked><span class="tt"></span></span></label>
-      <label class="or"><span class="ol">Camera Feed</span><span class="tog"><input type="checkbox" id="t-ca" checked><span class="tt"></span></span></label>
-    </div>
-    <div class="ps">
-      <div class="sl">Effects</div>
-      <label class="or"><span class="ol">Pulse Animation</span><span class="tog"><input type="checkbox" id="t-pu" checked><span class="tt"></span></span></label>
-      <label class="or"><span class="ol">Wireframe Bones</span><span class="tog"><input type="checkbox" id="t-wi"><span class="tt"></span></span></label>
-    </div>
-    <div class="ps">
-      <div class="sl">Performance</div>
-      <div class="sr">
-        <div class="sh"><span class="sll">MediaPipe Rate</span><span class="sv" id="sv-mp">20fps</span></div>
-        <div class="sw"><div class="st"></div><div class="sf" id="sf-mp" style="width:37%"></div><input type="range" id="sl-mp" min="5" max="30" step="1" value="20"></div>
-      </div>
-    </div>
   </div>
-</div>
 
-<!-- Record panel -->
-<div id="rpanel">
-  <div id="rh"><span id="rt">● RECORD</span><span id="rs"><span id="rd"></span><span id="rst">READY</span></span></div>
-  <div id="rb">
-    <div id="dr">
-      <button class="db active" data-sec="5">5s</button>
-      <button class="db" data-sec="10">10s</button>
-      <button class="db" data-sec="15">15s</button>
-      <button class="db" data-sec="30">30s</button>
-      <button class="db" data-sec="0">∞</button>
-    </div>
-    <div id="rpw"><div id="rpb"></div></div>
-    <div id="ri"><div id="rtimer">00:00</div><div id="rfi"><div id="rfc">0 FRAMES</div><div id="rfps">~ fps</div></div></div>
-    <button class="rbtn" id="recbtn">⏺ START RECORDING</button>
-    <button class="rbtn" id="expbtn">⬇ EXPORT FOR BLENDER</button>
-    <div id="rhint">Render loop: 60fps | MediaPipe: adjustable<br>Export ZIP with Blender .py script</div>
-  </div>
-</div>
+  <!-- ─── Bottom bar ──────────────────────────────────────────────── -->
+  <footer id="bar">
+    <span>LM: <span id="b-lm">0</span>/21</span>
+    <span>FINGERS: <span id="b-fi">-</span></span>
+    <span>HAND: <span id="b-ha">-</span></span>
+    <span>SMOOTH: <span id="b-sm">LOW</span></span>
+    <span class="hint">POINT CAMERA AT YOUR HAND</span>
+  </footer>
 
-<!-- Export modal -->
-<div id="emodal">
-  <div id="ebox">
-    <h2>EXPORT READY</h2>
-    <p>ZIP CONTAINS JSON + BLENDER PYTHON SCRIPT.<br>DRAG .PY INTO SCRIPTING EDITOR AND RUN IT.</p>
-    <div class="es"><span>DURATION</span><span id="ex-d">-</span></div>
-    <div class="es"><span>FRAMES</span><span id="ex-f">-</span></div>
-    <div class="es"><span>FPS</span><span id="ex-fps">-</span></div>
-    <div class="es"><span>LANDMARKS</span><span>21 / frame</span></div>
-    <div class="fl">
-      <div class="fi"><span>📄</span><div><div class="fn">hand_animation.json</div><div class="fd">Positions + timestamps</div></div></div>
-      <div class="fi"><span>🐍</span><div><div class="fn">import_hand_blender.py</div><div class="fd">Run in Blender → keyframed empties</div></div></div>
-    </div>
-    <div class="ma">
-      <button class="mb p" id="dlbtn">⬇ DOWNLOAD ZIP</button>
-      <button class="mb s" id="closebtn">CLOSE</button>
-    </div>
-  </div>
-</div>
+  <!-- ─── External libs (globals: THREE, JSZip, Hands) ───────────── -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.js" crossorigin="anonymous"></script>
 
-<div id="bar">
-  <span>LM: <span id="b-lm">0</span>/21</span>
-  <span>FINGERS: <span id="b-fi">-</span></span>
-  <span>HAND: <span id="b-ha">-</span></span>
-  <span>SMOOTH: <span id="b-sm">LOW</span></span>
-  <span style="margin-left:auto;color:rgba(0,255,231,.15)">POINT CAMERA AT YOUR HAND</span>
-</div>
+  <!-- ─── App entry point (ES module, deferred automatically) ─────── -->
+  <script type="module" src="js/main.js"></script>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.js" crossorigin="anonymous"></script>
-
-<script>
-'use strict';
-
-// ═══════════════════════════════════════════════════════════════════
-// ARCHITECTURE: TWO COMPLETELY INDEPENDENT LOOPS
-//
-//   Loop A — Render (requestAnimationFrame, ~60fps)
-//     Reads smoothed positions, updates InstancedMesh, renders scene.
-//     NEVER waits for MediaPipe. Always runs at full speed.
-//
-//   Loop B — MediaPipe (setTimeout, ~20fps by default, configurable)
-//     Captures a video frame, runs inference, writes raw positions.
-//     Completely decoupled from rendering.
-//
-//   Smoothing bridges the gap:
-//     render loop lerps smoothPos → rawPos at 60fps
-//     even at 20fps MP input, movement looks fluid.
-// ═══════════════════════════════════════════════════════════════════
-
-// ─── OPTIONS ───────────────────────────────────────────────────────
-const O = {
-  smooth: 0.18, scale: 1.20,
-  joints: true, bones: true, tips: true, particles: true, cam: true,
-  pulse: true, wire: false,
-  mpFPS: 20, // MediaPipe target FPS (independent of render)
-};
-
-// ─── CACHED DOM ─────────────────────────────────────────────────────
-const $ = id => document.getElementById(id);
-const V  = $('video');
-const dCam  = $('d-cam'), dMp = $('d-mp'), dHand = $('d-hand'), dSt = $('d-status');
-const bLm   = $('b-lm'),  bFi = $('b-fi'), bHa   = $('b-ha');
-const bSm   = $('b-sm'),  fps = $('fps');
-const rdot  = $('rd'),    rst = $('rst'), rtimer = $('rtimer');
-const rfc   = $('rfc'),   rfps = $('rfps'), rpb = $('rpb');
-const recbtn = $('recbtn'), expbtn = $('expbtn'), rhint = $('rhint');
-
-// ─── THREE.JS ──────────────────────────────────────────────────────
-const canvas = $('c');
-const renderer = new THREE.WebGLRenderer({
-  canvas, antialias: false, alpha: true,
-  powerPreference: 'high-performance',
-  // Avoid depth buffer clear overhead on transparent bg
-  premultipliedAlpha: false,
-});
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.toneMapping = THREE.NoToneMapping;
-
-const scene = new THREE.Scene();
-const cam3  = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.01, 100);
-cam3.position.set(0, 0, 1.4);
-
-scene.add(new THREE.AmbientLight(0x112233, 1.0));
-const rimL  = new THREE.DirectionalLight(0x00ffe7, 0.9); rimL.position.set(-2,2,1); scene.add(rimL);
-const pinkL = new THREE.PointLight(0xff00aa, 1.0, 3);    pinkL.position.set(1,-1,.5); scene.add(pinkL);
-const fillL = new THREE.PointLight(0x00ffe7, 0.5, 3);    fillL.position.set(-.5,.5,1); scene.add(fillL);
-
-// ─── INSTANCED GEOMETRY ────────────────────────────────────────────
-const NJ = 21, NC = 24;
-const CONN = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[0,9],[9,10],[10,11],[11,12],[0,13],[13,14],[14,15],[15,16],[0,17],[17,18],[18,19],[19,20],[5,9],[9,13],[13,17],[5,17]];
-const TIPS = new Set([4,8,12,16,20]);
-const CYAN = new THREE.Color(0x00ffe7), MAG = new THREE.Color(0xff00aa);
-
-// Joints: LOW poly (8×6)
-const jMat = new THREE.MeshStandardMaterial({ metalness:.6, roughness:.2, emissive:CYAN, emissiveIntensity:.35 });
-const jMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(.011, 8, 6), jMat, NJ);
-jMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-for (let i=0;i<NJ;i++) jMesh.setColorAt(i, TIPS.has(i)?MAG:CYAN);
-jMesh.instanceColor.needsUpdate = true;
-jMesh.visible = false; scene.add(jMesh);
-
-// Bones: LOW poly (6 sides)
-const bMat = new THREE.MeshStandardMaterial({ color:0x00c8b8, emissive:new THREE.Color(0x00ffe7), emissiveIntensity:.12, metalness:.8, roughness:.3, transparent:true, opacity:.8 });
-const bMesh = new THREE.InstancedMesh(new THREE.CylinderGeometry(.005,.005,1,6), bMat, NC);
-bMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-bMesh.visible = false; scene.add(bMesh);
-
-// Particles
-const gBuf = new Float32Array(NJ*3);
-const gGeo = new THREE.BufferGeometry();
-gGeo.setAttribute('position', new THREE.BufferAttribute(gBuf, 3));
-const gMesh = new THREE.Points(gGeo, new THREE.PointsMaterial({
-  color:0x00ffe7, size:.022, transparent:true, opacity:.22,
-  blending:THREE.AdditiveBlending, depthWrite:false,
-}));
-gMesh.visible = false; scene.add(gMesh);
-
-// ─── PRE-ALLOCATED SCRATCH (NO new() IN HOT PATH) ─────────────────
-const _v0=new THREE.Vector3(), _v1=new THREE.Vector3();
-const _vUp=new THREE.Vector3(0,1,0), _vMid=new THREE.Vector3();
-const _q=new THREE.Quaternion(), _s=new THREE.Vector3(1,1,1);
-const _m=new THREE.Matrix4(), _iq=new THREE.Quaternion(), _os=new THREE.Vector3(1,1,1);
-const _zero=new THREE.Matrix4().makeScale(0,0,0);
-
-// ─── LANDMARK STATE ────────────────────────────────────────────────
-const rawPos    = Array.from({length:NJ}, ()=>new THREE.Vector3());
-const smoothPos = Array.from({length:NJ}, ()=>new THREE.Vector3());
-let firstFrame = false, detected = false;
-// Shared volatile data written by MP loop, read by render loop
-// Using typed arrays for cache-friendly access
-const rawBuf = new Float32Array(NJ*3); // [x0,y0,z0,x1,y1,z1,...]
-let newDataFlag = false; // set true when MP writes fresh data
-
-// ─── HOT PATH: SMOOTH + WRITE INSTANCED MATRICES ──────────────────
-function updateScene() {
-  const a = O.smooth;
-  for (let i=0;i<NJ;i++) {
-    const b = i*3;
-    // Lerp raw → smooth
-    if (!firstFrame) {
-      smoothPos[i].set(rawBuf[b], rawBuf[b+1], rawBuf[b+2]);
-    } else {
-      smoothPos[i].x += (rawBuf[b]   - smoothPos[i].x) * a;
-      smoothPos[i].y += (rawBuf[b+1] - smoothPos[i].y) * a;
-      smoothPos[i].z += (rawBuf[b+2] - smoothPos[i].z) * a;
-    }
-    // Joint matrix
-    _m.compose(smoothPos[i], _iq, _os);
-    jMesh.setMatrixAt(i, _m);
-    // Glow buffer
-    gBuf[b]=smoothPos[i].x; gBuf[b+1]=smoothPos[i].y; gBuf[b+2]=smoothPos[i].z;
-  }
-  firstFrame = true;
-  jMesh.instanceMatrix.needsUpdate = true;
-  gGeo.attributes.position.needsUpdate = true;
-
-  for (let i=0;i<NC;i++) {
-    const [a2,b2] = CONN[i];
-    _v0.copy(smoothPos[a2]); _v1.copy(smoothPos[b2]);
-    _vMid.addVectors(_v0,_v1).multiplyScalar(.5);
-    _v1.sub(_v0);
-    const len = _v1.length();
-    if (len<.001) { bMesh.setMatrixAt(i,_zero); continue; }
-    _q.setFromUnitVectors(_vUp, _v1.divideScalar(len));
-    _s.set(1,len,1); _m.compose(_vMid,_q,_s);
-    bMesh.setMatrixAt(i, _m);
-  }
-  bMesh.instanceMatrix.needsUpdate = true;
-}
-
-// ─── MEDIAPIPE LOOP (independent, throttled) ──────────────────────
-// Key insight: we DON'T use Camera utility (it runs at video fps, ~30fps,
-// calling hands.send() which blocks). Instead we manually schedule
-// inference at our chosen rate with setTimeout so it never blocks rAF.
-let mpRunning = false, mpTimeout = null;
-let mpHands   = null;
-
-function scheduleMP() {
-  mpTimeout = setTimeout(runMP, 1000 / O.mpFPS);
-}
-
-async function runMP() {
-  if (!mpRunning || !mpHands || V.readyState < 2) { scheduleMP(); return; }
-  try {
-    await mpHands.send({ image: V });
-  } catch(e) { /* ignore */ }
-  scheduleMP(); // schedule AFTER inference completes → no stacking
-}
-
-function onMPResults(r) {
-  dMp.classList.add('on');
-  if (r.multiHandLandmarks?.length > 0) {
-    const lms = r.multiHandLandmarks[0];
-    const sc  = O.scale;
-    for (let i=0;i<NJ;i++) {
-      const b=i*3;
-      rawBuf[b]   = -(lms[i].x-.5)*sc;
-      rawBuf[b+1] = -(lms[i].y-.5)*sc;
-      rawBuf[b+2] = -lms[i].z*.8;
-    }
-    detected = true;
-    newDataFlag = true;
-    _uiD.det=true; _uiD.fi=countFi(lms); _uiD.ha=r.multiHandedness[0]?.label||'-';
-  } else {
-    detected = false; firstFrame = false;
-    jMesh.visible=false; bMesh.visible=false; gMesh.visible=false;
-    _uiD.det=false;
-    if (isRec) stopRec();
-  }
-}
-
-function countFi(lms) {
-  let c = lms[4].x<lms[3].x?1:0;
-  const T=[8,12,16,20], P=[6,10,14,18];
-  for(let i=0;i<4;i++) if(lms[T[i]].y<lms[P[i]].y) c++;
-  return c;
-}
-
-// ─── UI THROTTLE ───────────────────────────────────────────────────
-const _uiD = {det:false,fi:'-',ha:'-'};
-let _uiTick = 0;
-function updateUI() {
-  if (++_uiTick < 8) return; _uiTick=0;
-  if (_uiD.det) {
-    dHand.classList.add('on');
-    bLm.textContent='21'; bFi.textContent=_uiD.fi; bHa.textContent=_uiD.ha;
-  } else {
-    dHand.classList.remove('on');
-    bLm.textContent='0'; bFi.textContent='-'; bHa.textContent='-';
-  }
-}
-
-// ─── FPS ───────────────────────────────────────────────────────────
-let _fLast=0, _fCnt=0, _fVal=0;
-function tickFPS(now) {
-  _fCnt++;
-  if (now-_fLast>=600) {
-    _fVal=Math.round(_fCnt/((now-_fLast)/1000));
-    _fCnt=0; _fLast=now;
-    fps.textContent=_fVal+' FPS';
-    fps.className=_fVal>=50?'good':_fVal>=28?'mid':'bad';
-  }
-}
-
-// ─── RECORDING ─────────────────────────────────────────────────────
-let isRec=false, recFrames=[], recStart=0, recDur=5, recTimer=null, lastCap=0;
-const CAP_MS = 1000/30;
-
-function startRec() {
-  recFrames=[]; recStart=performance.now(); lastCap=0; isRec=true;
-  recbtn.textContent='⏹ STOP RECORDING'; recbtn.classList.add('stop');
-  rdot.classList.add('recording'); rst.textContent='REC';
-  rtimer.classList.add('active'); expbtn.classList.remove('visible');
-  V.classList.add('rec-on');
-  document.querySelectorAll('.db').forEach(b=>b.disabled=true);
-  recTimer=setInterval(tickRecUI,100);
-}
-
-function stopRec() {
-  isRec=false; clearInterval(recTimer);
-  recbtn.textContent='⏺ START RECORDING'; recbtn.classList.remove('stop');
-  rdot.classList.remove('recording'); rdot.classList.add('ready');
-  rst.textContent='DONE'; rtimer.classList.remove('active');
-  V.classList.remove('rec-on'); rpb.style.width='100%';
-  document.querySelectorAll('.db').forEach(b=>b.disabled=false);
-  if (recFrames.length>0) {
-    expbtn.classList.add('visible');
-    const el=recFrames[recFrames.length-1].t;
-    rhint.textContent=`✓ ${recFrames.length} frames @ ${(recFrames.length/Math.max(el,.001)).toFixed(1)}fps`;
-  }
-}
-
-function tickRecUI() {
-  if (!isRec) return;
-  const el=(performance.now()-recStart)/1000;
-  const m=Math.floor(el/60),s=Math.floor(el%60);
-  rtimer.textContent=String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
-  rfc.textContent=recFrames.length+' FRAMES';
-  if(el>0) rfps.textContent=(recFrames.length/el).toFixed(1)+' fps';
-  if(recDur>0) rpb.style.width=Math.min(100,(el/recDur)*100)+'%';
-  if(recDur>0&&el>=recDur) stopRec();
-}
-
-function captureFrame() {
-  const now=performance.now();
-  if(now-lastCap<CAP_MS) return; lastCap=now;
-  recFrames.push({
-    t:+((now-recStart)/1000).toFixed(4),
-    lm: Array.from(smoothPos).flatMap(v=>[+v.x.toFixed(5),+v.y.toFixed(5),+v.z.toFixed(5)])
-  });
-}
-
-// ─── RENDER LOOP (RUNS AT ~60fps ALWAYS) ──────────────────────────
-let t=0;
-function render(now) {
-  requestAnimationFrame(render);
-  tickFPS(now); t+=0.01; updateUI();
-
-  if (detected) {
-    updateScene();
-    if(isRec) captureFrame();
-    jMesh.visible=O.joints; bMesh.visible=O.bones; gMesh.visible=O.particles;
-  } else {
-    cam3.position.x=Math.sin(t*.3)*.05;
-    cam3.position.y=Math.cos(t*.2)*.03;
-  }
-
-  if (O.pulse) {
-    const p=Math.sin(t*2.5)*.5+.5;
-    pinkL.intensity=.8+p*.45;
-    fillL.intensity=.35+p*.25;
-    if(detected){ jMat.emissiveIntensity=.25+p*.3; bMat.emissiveIntensity=.08+p*.12; }
-  }
-
-  cam3.lookAt(0,0,0);
-  renderer.render(scene, cam3);
-}
-
-// ─── SETTINGS ──────────────────────────────────────────────────────
-const sb=$('sbtn'), sp=$('spanel');
-let po=false;
-sb.addEventListener('click',e=>{e.stopPropagation();po=!po;sp.classList.toggle('open',po);sb.classList.toggle('open',po);sb.textContent=po?'✕ CLOSE':'⚙ SETTINGS';});
-document.addEventListener('click',e=>{ if(po&&!sp.contains(e.target)&&e.target!==sb){po=false;sp.classList.remove('open');sb.classList.remove('open');sb.textContent='⚙ SETTINGS';}});
-sp.addEventListener('click',e=>e.stopPropagation());
-
-function mkSlider(id,fid,vid,key,mn,mx,fmt,cb){
-  const el=$('sl-'+id),fi=$('sf-'+id),vl=$('sv-'+id);
-  const u=()=>{const v=parseFloat(el.value);O[key]=v;vl.textContent=fmt(v);fi.style.width=((v-mn)/(mx-mn)*100)+'%';if(cb)cb(v);};
-  el.addEventListener('input',u); u();
-}
-const sml=v=>v>=.8?'RAW':v>=.5?'LOW':v>=.2?'MED':'HIGH';
-mkSlider('sm','sm','sm','smooth',.02,1.0,sml,v=>{bSm.textContent=sml(v);});
-mkSlider('sc','sc','sc','scale',.5,2.5,v=>v.toFixed(2));
-mkSlider('mp','mp','mp','mpFPS',5,30,v=>v+'fps',v=>{
-  // Restart MP loop with new interval
-  if(mpTimeout) clearTimeout(mpTimeout);
-  O.mpFPS=v; scheduleMP();
-});
-
-function mkTog(id,key,cb){
-  const el=$(id); el.addEventListener('change',()=>{O[key]=el.checked;if(cb)cb(el.checked);});
-}
-mkTog('t-jo','joints'); mkTog('t-bo','bones'); mkTog('t-ti','tips');
-mkTog('t-pa','particles',v=>{if(!v)gMesh.visible=false;});
-mkTog('t-ca','cam',v=>V.classList.toggle('hidden',!v));
-mkTog('t-pu','pulse');
-mkTog('t-wi','wire',v=>{bMat.wireframe=v;});
-
-document.querySelectorAll('.db').forEach(b=>{
-  b.addEventListener('click',()=>{
-    if(isRec) return;
-    document.querySelectorAll('.db').forEach(x=>x.classList.remove('active'));
-    b.classList.add('active'); recDur=parseInt(b.dataset.sec);
-    rpb.style.width='0%';
-  });
-});
-recbtn.addEventListener('click',()=>isRec?stopRec():startRec());
-
-// ─── BLENDER SCRIPT ───────────────────────────────────────────────
-function blenderScript(fn){
-return `# HAND.TRACK 3D — Blender Import Script
-# Blender 3.0+ | Scripting workspace → Open → Run Script (▶)
-import bpy, json, os
-from mathutils import Vector
-SCRIPT_DIR=os.path.dirname(os.path.abspath(__file__))
-JSON_PATH=os.path.join(SCRIPT_DIR,"${fn}")
-SCALE=1.0
-NAMES=["Wrist","Thumb_CMC","Thumb_MCP","Thumb_IP","Thumb_Tip","Index_MCP","Index_PIP","Index_DIP","Index_Tip","Middle_MCP","Middle_PIP","Middle_DIP","Middle_Tip","Ring_MCP","Ring_PIP","Ring_DIP","Ring_Tip","Pinky_MCP","Pinky_PIP","Pinky_DIP","Pinky_Tip"]
-TIPS={4,8,12,16,20}
-# Three.js Y-up → Blender Z-up
-def bl(x,y,z): return Vector((x*SCALE,-z*SCALE,y*SCALE))
-with open(JSON_PATH) as f: data=json.load(f)
-fps=data.get("fps",30); frames=data["frames"]; N=len(frames)
-scene=bpy.context.scene
-scene.render.fps=fps; scene.frame_start=1; scene.frame_end=N
-if "HandTracking" in bpy.data.collections:
-    col=bpy.data.collections["HandTracking"]
-    for o in list(col.objects): bpy.data.objects.remove(o,do_unlink=True)
-    bpy.data.collections.remove(col)
-col=bpy.data.collections.new("HandTracking")
-scene.collection.children.link(col)
-empties=[]
-for i,name in enumerate(NAMES):
-    bpy.ops.object.empty_add(type="SPHERE",location=(0,0,0))
-    o=bpy.context.active_object; o.name=f"Hand_{name}"
-    o.empty_display_size=0.014 if i in TIPS else 0.009
-    o.color=(1,0,.67,1) if i in TIPS else (0,1,.91,1)
-    for c in list(o.users_collection): c.objects.unlink(o)
-    col.objects.link(o); empties.append(o)
-print(f"Inserting {N} keyframes...")
-for fi,fd in enumerate(frames):
-    lm=fd["lm"]
-    for i,obj in enumerate(empties):
-        obj.location=bl(lm[i*3],lm[i*3+1],lm[i*3+2])
-        obj.keyframe_insert(data_path="location",frame=fi+1)
-for obj in empties:
-    if obj.animation_data and obj.animation_data.action:
-        for fc in obj.animation_data.action.fcurves:
-            for kp in fc.keyframe_points: kp.interpolation="LINEAR"
-print(f"Done! HandTracking: {len(empties)} empties × {N} keyframes @ {fps}fps")
-print("Tip: use Copy Location constraints on a Rigify hand armature")
-`;}
-
-expbtn.addEventListener('click',()=>{
-  if(!recFrames.length) return;
-  const el=recFrames[recFrames.length-1].t, fpv=(recFrames.length/Math.max(el,.001));
-  $('ex-d').textContent=el.toFixed(2)+'s'; $('ex-f').textContent=recFrames.length; $('ex-fps').textContent=fpv.toFixed(1);
-  $('emodal').classList.add('visible');
-});
-$('dlbtn').addEventListener('click', async()=>{
-  const el=recFrames[recFrames.length-1]?.t||0;
-  const fpv=Math.round(recFrames.length/Math.max(el,.001))||30;
-  const fn='hand_animation.json';
-  const data={version:'2.0',generator:'Hand.Track 3D',fps:fpv,frameCount:recFrames.length,duration:+el.toFixed(3),landmarks:21,format:'lm: flat array [x0,y0,z0,...] Three.js Y-up',frames:recFrames};
-  const zip=new JSZip();
-  zip.file(fn, JSON.stringify(data));
-  zip.file('import_hand_blender.py', blenderScript(fn));
-  zip.file('README.txt',`HAND.TRACK 3D EXPORT\nFrames: ${recFrames.length} | Duration: ${el.toFixed(2)}s | FPS: ${fpv}\nBlender: Scripting → Open import_hand_blender.py → Run Script\nRecorded: ${new Date().toLocaleString()}`);
-  const blob=await zip.generateAsync({type:'blob'});
-  const a=Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:`hand_track_${Date.now()}.zip`});
-  a.click(); URL.revokeObjectURL(a.href);
-  $('emodal').classList.remove('visible');
-});
-$('closebtn').addEventListener('click',()=>$('emodal').classList.remove('visible'));
-
-// ─── INIT ──────────────────────────────────────────────────────────
-function prog(p,m){$('lb').style.width=p+'%';$('lm').textContent=m;}
-
-async function init() {
-  prog(10,'THREE.JS READY');
-  await new Promise(r=>setTimeout(r,150));
-
-  prog(30,'REQUESTING CAMERA...');
-  try {
-    V.srcObject = await navigator.mediaDevices.getUserMedia({
-      video:{ width:320, height:240, facingMode:'user',
-              frameRate:{ ideal:30 } }
-    });
-    dCam.classList.add('on');
-    prog(55,'CAMERA ACTIVE');
-  } catch(e) { prog(30,'CAMERA DENIED'); return; }
-
-  prog(70,'LOADING MEDIAPIPE...');
-  await new Promise(r=>setTimeout(r,200));
-
-  mpHands = new Hands({
-    locateFile: f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${f}`
-  });
-  mpHands.setOptions({
-    maxNumHands:1,
-    modelComplexity:0,          // lite model = fastest
-    minDetectionConfidence:.65,
-    minTrackingConfidence:.5,
-  });
-  mpHands.onResults(onMPResults);
-
-  // Warm up model (first call is slow)
-  prog(80,'WARMING UP MODEL...');
-  await new Promise(r=>{ V.onloadeddata=r; if(V.readyState>=2) r(); });
-  try { await mpHands.send({image:V}); } catch(e){}
-
-  prog(95,'STARTING LOOPS...');
-  mpRunning = true;
-  scheduleMP(); // ← Start independent MP loop
-
-  dMp.classList.add('on');
-  prog(100,'READY');
-  dSt.textContent='LIVE';
-  await new Promise(r=>setTimeout(r,250));
-  $('ls').classList.add('hidden');
-}
-
-window.addEventListener('resize',()=>{
-  cam3.aspect=window.innerWidth/window.innerHeight;
-  cam3.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth,window.innerHeight);
-});
-
-// Kickoff both loops
-requestAnimationFrame(render);
-init();
-</script>
 </body>
 </html>
