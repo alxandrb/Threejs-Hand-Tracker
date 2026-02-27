@@ -11,6 +11,8 @@
   :root {
     --cyan: #00ffe7;
     --magenta: #ff00aa;
+    --red: #ff3355;
+    --green: #00ff88;
     --dark: #050a0f;
     --grid: rgba(0,255,231,0.04);
   }
@@ -28,8 +30,7 @@
     background-image:
       linear-gradient(var(--grid) 1px, transparent 1px),
       linear-gradient(90deg, var(--grid) 1px, transparent 1px);
-    background-size: 40px 40px;
-    pointer-events: none;
+    background-size: 40px 40px; pointer-events: none;
   }
 
   #canvas-container { position: fixed; inset: 0; z-index: 1; }
@@ -43,13 +44,14 @@
     transition: opacity 0.4s, transform 0.4s;
   }
   #video.hidden { opacity: 0 !important; pointer-events: none; transform: scaleX(-1) scale(0.85); }
+  #video.recording-border { border-color: var(--red); box-shadow: 0 0 12px rgba(255,51,85,0.5); }
 
+  /* ─── TOP UI ─── */
   #ui {
     position: fixed; top: 0; left: 0; right: 0; z-index: 10;
     display: flex; align-items: flex-start; justify-content: space-between;
     padding: 20px 28px; pointer-events: none;
   }
-
   #title {
     font-family: 'Rajdhani', sans-serif; font-weight: 600;
     font-size: 22px; letter-spacing: 6px; text-transform: uppercase;
@@ -60,6 +62,7 @@
   #status-panel { font-size: 11px; line-height: 1.9; color: rgba(0,255,231,0.6); text-align: right; }
   .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #333; margin-right: 6px; vertical-align: middle; }
   .dot.active { background: var(--cyan); box-shadow: 0 0 8px var(--cyan); animation: blink 1.2s ease-in-out infinite; }
+  .dot.red { background: var(--red) !important; box-shadow: 0 0 8px var(--red) !important; }
   @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
 
   /* ─── SETTINGS BUTTON ─── */
@@ -70,8 +73,7 @@
     color: rgba(0,255,231,0.5); font-family: 'Share Tech Mono', monospace;
     font-size: 10px; letter-spacing: 3px; padding: 7px 20px;
     cursor: pointer; text-transform: uppercase;
-    transition: all 0.2s; backdrop-filter: blur(6px);
-    white-space: nowrap;
+    transition: all 0.2s; backdrop-filter: blur(6px); white-space: nowrap;
   }
   #settings-btn:hover { border-color: var(--cyan); color: var(--cyan); box-shadow: 0 0 14px rgba(0,255,231,0.2); }
   #settings-btn.open { border-color: var(--magenta); color: var(--magenta); box-shadow: 0 0 14px rgba(255,0,170,0.25); }
@@ -83,8 +85,7 @@
     background: rgba(4, 12, 18, 0.95);
     border: 1px solid rgba(0,255,231,0.12);
     backdrop-filter: blur(20px);
-    overflow: hidden;
-    max-height: 0;
+    overflow: hidden; max-height: 0;
     transition: max-height 0.38s cubic-bezier(.4,0,.2,1), border-color 0.2s;
     box-shadow: 0 12px 50px rgba(0,0,0,0.7);
   }
@@ -93,53 +94,36 @@
   .panel-inner { padding: 16px 22px 22px; }
   .panel-section { margin-bottom: 20px; }
   .panel-section:last-child { margin-bottom: 0; }
-
   .section-label {
     font-size: 9px; letter-spacing: 4px; color: rgba(0,255,231,0.3);
     text-transform: uppercase; margin-bottom: 10px;
     border-bottom: 1px solid rgba(0,255,231,0.07); padding-bottom: 6px;
   }
 
-  /* ── Toggle rows ── */
   .opt-row {
     display: flex; align-items: center; justify-content: space-between;
     padding: 5px 0; cursor: pointer;
   }
   .opt-row:hover .opt-label { color: rgba(0,255,231,0.9); }
-  .opt-label {
-    font-size: 11px; letter-spacing: 2px;
-    color: rgba(0,255,231,0.5); text-transform: uppercase;
-    user-select: none; transition: color 0.15s;
-  }
+  .opt-label { font-size: 11px; letter-spacing: 2px; color: rgba(0,255,231,0.5); text-transform: uppercase; user-select: none; transition: color 0.15s; }
 
   .toggle { position: relative; width: 38px; height: 20px; flex-shrink: 0; }
   .toggle input { opacity: 0; width: 0; height: 0; }
   .toggle-track {
     position: absolute; inset: 0;
-    background: rgba(0,255,231,0.06);
-    border: 1px solid rgba(0,255,231,0.18);
+    background: rgba(0,255,231,0.06); border: 1px solid rgba(0,255,231,0.18);
     border-radius: 10px; cursor: pointer;
     transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
   }
   .toggle-track::after {
-    content: '';
-    position: absolute; top: 3px; left: 3px;
+    content: ''; position: absolute; top: 3px; left: 3px;
     width: 12px; height: 12px; border-radius: 50%;
     background: rgba(0,255,231,0.3);
     transition: transform 0.22s ease, background 0.2s;
   }
-  .toggle input:checked + .toggle-track {
-    background: rgba(0,255,231,0.12);
-    border-color: var(--cyan);
-    box-shadow: 0 0 10px rgba(0,255,231,0.18);
-  }
-  .toggle input:checked + .toggle-track::after {
-    transform: translateX(18px);
-    background: var(--cyan);
-    box-shadow: 0 0 7px var(--cyan);
-  }
+  .toggle input:checked + .toggle-track { background: rgba(0,255,231,0.12); border-color: var(--cyan); box-shadow: 0 0 10px rgba(0,255,231,0.18); }
+  .toggle input:checked + .toggle-track::after { transform: translateX(18px); background: var(--cyan); box-shadow: 0 0 7px var(--cyan); }
 
-  /* ── Sliders ── */
   .slider-row { padding: 5px 0; }
   .slider-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
   .slider-label { font-size: 11px; letter-spacing: 2px; color: rgba(0,255,231,0.5); text-transform: uppercase; }
@@ -147,29 +131,180 @@
 
   .slider-wrap { position: relative; height: 18px; display: flex; align-items: center; }
   .slider-track { position: absolute; left: 0; right: 0; height: 2px; background: rgba(0,255,231,0.08); border-radius: 1px; }
-  .slider-fill {
-    position: absolute; left: 0; height: 2px;
-    background: linear-gradient(90deg, var(--cyan), var(--magenta));
-    border-radius: 1px; box-shadow: 0 0 6px rgba(0,255,231,0.35);
-    pointer-events: none;
-  }
-  input[type=range] {
-    -webkit-appearance: none;
-    position: relative; width: 100%; height: 18px;
-    background: transparent; cursor: pointer; margin: 0;
-  }
-  input[type=range]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 14px; height: 14px; border-radius: 50%;
-    background: var(--dark); border: 2px solid var(--cyan);
-    box-shadow: 0 0 8px var(--cyan); transition: transform 0.12s, box-shadow 0.12s;
-  }
+  .slider-fill { position: absolute; left: 0; height: 2px; background: linear-gradient(90deg, var(--cyan), var(--magenta)); border-radius: 1px; box-shadow: 0 0 6px rgba(0,255,231,0.35); pointer-events: none; }
+  input[type=range] { -webkit-appearance: none; position: relative; width: 100%; height: 18px; background: transparent; cursor: pointer; margin: 0; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--dark); border: 2px solid var(--cyan); box-shadow: 0 0 8px var(--cyan); transition: transform 0.12s, box-shadow 0.12s; }
   input[type=range]:hover::-webkit-slider-thumb { transform: scale(1.25); box-shadow: 0 0 16px var(--cyan); }
-  input[type=range]::-moz-range-thumb {
-    width: 14px; height: 14px; border-radius: 50%;
-    background: var(--dark); border: 2px solid var(--cyan);
-    box-shadow: 0 0 8px var(--cyan); cursor: pointer;
+  input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--dark); border: 2px solid var(--cyan); box-shadow: 0 0 8px var(--cyan); cursor: pointer; }
+
+  /* ─── RECORD PANEL ─── */
+  #rec-panel {
+    position: fixed; bottom: 50px; left: 24px;
+    z-index: 20; width: 260px;
+    background: rgba(4, 12, 18, 0.92);
+    border: 1px solid rgba(0,255,231,0.15);
+    backdrop-filter: blur(16px);
+    box-shadow: 0 8px 40px rgba(0,0,0,0.6);
   }
+
+  #rec-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 1px solid rgba(0,255,231,0.08);
+  }
+  #rec-title { font-size: 10px; letter-spacing: 4px; color: rgba(0,255,231,0.5); text-transform: uppercase; }
+
+  #rec-status {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 10px; letter-spacing: 2px;
+  }
+  #rec-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #333;
+  }
+  #rec-dot.recording { background: var(--red); box-shadow: 0 0 10px var(--red); animation: blink 0.7s ease-in-out infinite; }
+  #rec-dot.ready { background: var(--green); box-shadow: 0 0 8px var(--green); }
+
+  #rec-body { padding: 12px 14px 14px; }
+
+  /* Duration selector */
+  #dur-row {
+    display: flex; gap: 6px; margin-bottom: 12px;
+  }
+  .dur-btn {
+    flex: 1; padding: 5px 0; text-align: center;
+    border: 1px solid rgba(0,255,231,0.15);
+    background: transparent;
+    color: rgba(0,255,231,0.4);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px; letter-spacing: 1px;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .dur-btn:hover { border-color: rgba(0,255,231,0.4); color: rgba(0,255,231,0.8); }
+  .dur-btn.active { border-color: var(--cyan); color: var(--cyan); background: rgba(0,255,231,0.06); box-shadow: 0 0 8px rgba(0,255,231,0.15); }
+
+  /* Progress bar */
+  #rec-progress-wrap {
+    height: 3px; background: rgba(0,255,231,0.08);
+    margin-bottom: 10px; overflow: hidden; border-radius: 1px;
+  }
+  #rec-progress-bar {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, var(--red), var(--magenta));
+    box-shadow: 0 0 8px var(--red);
+    transition: width 0.1s linear;
+  }
+
+  /* Timer + frames display */
+  #rec-info {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 12px;
+  }
+  #rec-timer { font-size: 22px; letter-spacing: 2px; color: rgba(0,255,231,0.3); transition: color 0.2s; }
+  #rec-timer.active { color: var(--red); text-shadow: 0 0 16px var(--red); }
+  #rec-frames { font-size: 10px; color: rgba(0,255,231,0.3); letter-spacing: 2px; text-align: right; line-height: 1.6; }
+
+  /* Buttons */
+  #rec-btn {
+    width: 100%; padding: 9px 0;
+    border: 1px solid rgba(255,51,85,0.4);
+    background: rgba(255,51,85,0.06);
+    color: rgba(255,51,85,0.7);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px; letter-spacing: 4px;
+    cursor: pointer; text-transform: uppercase;
+    transition: all 0.2s; margin-bottom: 7px;
+  }
+  #rec-btn:hover:not(:disabled) { border-color: var(--red); color: var(--red); background: rgba(255,51,85,0.12); box-shadow: 0 0 14px rgba(255,51,85,0.2); }
+  #rec-btn.stop { border-color: var(--red); color: var(--red); background: rgba(255,51,85,0.1); animation: recPulse 1s ease-in-out infinite; }
+  #rec-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  @keyframes recPulse {
+    0%,100% { box-shadow: 0 0 6px rgba(255,51,85,0.2); }
+    50% { box-shadow: 0 0 20px rgba(255,51,85,0.5); }
+  }
+
+  #export-btn {
+    width: 100%; padding: 9px 0;
+    border: 1px solid rgba(0,255,136,0.4);
+    background: rgba(0,255,136,0.06);
+    color: rgba(0,255,136,0.7);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px; letter-spacing: 3px;
+    cursor: pointer; text-transform: uppercase;
+    transition: all 0.2s; display: none;
+  }
+  #export-btn.visible { display: block; }
+  #export-btn:hover { border-color: var(--green); color: var(--green); background: rgba(0,255,136,0.12); box-shadow: 0 0 14px rgba(0,255,136,0.25); }
+
+  #rec-hint {
+    margin-top: 8px; font-size: 9px; letter-spacing: 1px;
+    color: rgba(0,255,231,0.2); text-align: center; line-height: 1.6;
+  }
+
+  /* ─── EXPORT MODAL ─── */
+  #export-modal {
+    position: fixed; inset: 0; z-index: 50;
+    background: rgba(5,10,15,0.88);
+    backdrop-filter: blur(8px);
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.3s;
+  }
+  #export-modal.visible { opacity: 1; pointer-events: all; }
+
+  #export-box {
+    width: 460px;
+    background: rgba(4, 12, 18, 0.98);
+    border: 1px solid rgba(0,255,136,0.3);
+    box-shadow: 0 0 60px rgba(0,255,136,0.1);
+    padding: 28px 30px 24px;
+  }
+
+  #export-box h2 {
+    font-family: 'Rajdhani', sans-serif; font-size: 18px;
+    letter-spacing: 6px; color: var(--green);
+    text-shadow: 0 0 20px var(--green);
+    margin-bottom: 6px;
+  }
+  #export-box p {
+    font-size: 10px; letter-spacing: 2px; color: rgba(0,255,231,0.4);
+    margin-bottom: 20px; line-height: 1.7;
+  }
+
+  .export-stat {
+    display: flex; justify-content: space-between;
+    padding: 5px 0; border-bottom: 1px solid rgba(0,255,231,0.06);
+    font-size: 11px;
+  }
+  .export-stat span:first-child { color: rgba(0,255,231,0.4); letter-spacing: 2px; }
+  .export-stat span:last-child { color: var(--cyan); }
+
+  .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+
+  .modal-btn {
+    flex: 1; padding: 10px 0; text-align: center;
+    border: 1px solid; font-family: 'Share Tech Mono', monospace;
+    font-size: 11px; letter-spacing: 3px;
+    cursor: pointer; text-transform: uppercase; transition: all 0.2s;
+    background: transparent;
+  }
+  .modal-btn.primary { border-color: rgba(0,255,136,0.5); color: var(--green); }
+  .modal-btn.primary:hover { background: rgba(0,255,136,0.08); box-shadow: 0 0 14px rgba(0,255,136,0.2); }
+  .modal-btn.secondary { border-color: rgba(0,255,231,0.2); color: rgba(0,255,231,0.4); }
+  .modal-btn.secondary:hover { border-color: rgba(0,255,231,0.5); color: var(--cyan); }
+
+  .file-list { margin: 14px 0 0; }
+  .file-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 10px;
+    background: rgba(0,255,231,0.03);
+    border: 1px solid rgba(0,255,231,0.07);
+    margin-bottom: 5px;
+  }
+  .file-icon { font-size: 14px; }
+  .file-name { font-size: 11px; color: rgba(0,255,231,0.7); letter-spacing: 1px; }
+  .file-desc { font-size: 9px; color: rgba(0,255,231,0.3); letter-spacing: 1px; margin-top: 1px; }
 
   /* ─── BOTTOM BAR ─── */
   #bottom-bar {
@@ -191,11 +326,7 @@
     transition: opacity 0.8s ease;
   }
   #loading-screen.hidden { opacity: 0; pointer-events: none; }
-  .loader-title {
-    font-family: 'Rajdhani', sans-serif; font-size: 28px;
-    font-weight: 600; letter-spacing: 10px;
-    color: var(--cyan); text-shadow: 0 0 30px var(--cyan);
-  }
+  .loader-title { font-family: 'Rajdhani', sans-serif; font-size: 28px; font-weight: 600; letter-spacing: 10px; color: var(--cyan); text-shadow: 0 0 30px var(--cyan); }
   .loader-bar-wrap { width: 280px; height: 2px; background: rgba(0,255,231,0.1); border-radius: 2px; overflow: hidden; }
   .loader-bar { height: 100%; width: 0%; background: linear-gradient(90deg, var(--cyan), var(--magenta)); transition: width 0.3s ease; box-shadow: 0 0 10px var(--cyan); }
   .loader-msg { font-size: 11px; color: rgba(0,255,231,0.5); letter-spacing: 3px; }
@@ -211,7 +342,7 @@
 </head>
 <body>
 <div id="bg-grid"></div>
-<div id="scan-line" id="scan-line"></div>
+<div id="scan-line"></div>
 
 <div id="loading-screen">
   <div class="loader-title">HAND.TRACK</div>
@@ -222,6 +353,7 @@
 <div id="canvas-container"></div>
 <video id="video" autoplay muted playsinline></video>
 
+<!-- Top UI -->
 <div id="ui">
   <div><div id="title">HAND<span>.</span>TRACK <span>3D</span></div></div>
   <div id="status-panel">
@@ -232,82 +364,93 @@
   </div>
 </div>
 
+<!-- Settings -->
 <button id="settings-btn">⚙ SETTINGS</button>
-
 <div id="settings-panel">
   <div class="panel-inner">
-
     <div class="panel-section">
       <div class="section-label">Motion</div>
-
       <div class="slider-row">
-        <div class="slider-header">
-          <span class="slider-label">Smoothing</span>
-          <span class="slider-value" id="smooth-val">LOW</span>
-        </div>
-        <div class="slider-wrap">
-          <div class="slider-track"></div>
-          <div class="slider-fill" id="smooth-fill" style="width:18%"></div>
-          <input type="range" id="smooth-slider" min="0.02" max="1.0" step="0.01" value="0.18">
-        </div>
+        <div class="slider-header"><span class="slider-label">Smoothing</span><span class="slider-value" id="smooth-val">LOW</span></div>
+        <div class="slider-wrap"><div class="slider-track"></div><div class="slider-fill" id="smooth-fill" style="width:18%"></div><input type="range" id="smooth-slider" min="0.02" max="1.0" step="0.01" value="0.18"></div>
       </div>
-
       <div class="slider-row" style="margin-top:10px">
-        <div class="slider-header">
-          <span class="slider-label">Scale</span>
-          <span class="slider-value" id="scale-val">1.20</span>
-        </div>
-        <div class="slider-wrap">
-          <div class="slider-track"></div>
-          <div class="slider-fill" id="scale-fill" style="width:35%"></div>
-          <input type="range" id="scale-slider" min="0.5" max="2.5" step="0.05" value="1.20">
-        </div>
+        <div class="slider-header"><span class="slider-label">Scale</span><span class="slider-value" id="scale-val">1.20</span></div>
+        <div class="slider-wrap"><div class="slider-track"></div><div class="slider-fill" id="scale-fill" style="width:35%"></div><input type="range" id="scale-slider" min="0.5" max="2.5" step="0.05" value="1.20"></div>
       </div>
     </div>
-
     <div class="panel-section">
       <div class="section-label">Visibility</div>
-      <label class="opt-row">
-        <span class="opt-label">Joints</span>
-        <span class="toggle"><input type="checkbox" id="tog-joints" checked><span class="toggle-track"></span></span>
-      </label>
-      <label class="opt-row">
-        <span class="opt-label">Bones</span>
-        <span class="toggle"><input type="checkbox" id="tog-bones" checked><span class="toggle-track"></span></span>
-      </label>
-      <label class="opt-row">
-        <span class="opt-label">Fingertip Highlights</span>
-        <span class="toggle"><input type="checkbox" id="tog-tips" checked><span class="toggle-track"></span></span>
-      </label>
-      <label class="opt-row">
-        <span class="opt-label">Particles</span>
-        <span class="toggle"><input type="checkbox" id="tog-particles" checked><span class="toggle-track"></span></span>
-      </label>
-      <label class="opt-row">
-        <span class="opt-label">Camera Feed</span>
-        <span class="toggle"><input type="checkbox" id="tog-cam" checked><span class="toggle-track"></span></span>
-      </label>
+      <label class="opt-row"><span class="opt-label">Joints</span><span class="toggle"><input type="checkbox" id="tog-joints" checked><span class="toggle-track"></span></span></label>
+      <label class="opt-row"><span class="opt-label">Bones</span><span class="toggle"><input type="checkbox" id="tog-bones" checked><span class="toggle-track"></span></span></label>
+      <label class="opt-row"><span class="opt-label">Fingertip Highlights</span><span class="toggle"><input type="checkbox" id="tog-tips" checked><span class="toggle-track"></span></span></label>
+      <label class="opt-row"><span class="opt-label">Particles</span><span class="toggle"><input type="checkbox" id="tog-particles" checked><span class="toggle-track"></span></span></label>
+      <label class="opt-row"><span class="opt-label">Camera Feed</span><span class="toggle"><input type="checkbox" id="tog-cam" checked><span class="toggle-track"></span></span></label>
     </div>
-
     <div class="panel-section">
       <div class="section-label">Effects</div>
-      <label class="opt-row">
-        <span class="opt-label">Pulse Animation</span>
-        <span class="toggle"><input type="checkbox" id="tog-pulse" checked><span class="toggle-track"></span></span>
-      </label>
-      <label class="opt-row">
-        <span class="opt-label">Wireframe Bones</span>
-        <span class="toggle"><input type="checkbox" id="tog-wire"><span class="toggle-track"></span></span>
-      </label>
-      <label class="opt-row">
-        <span class="opt-label">Scan Line</span>
-        <span class="toggle"><input type="checkbox" id="tog-scan" checked><span class="toggle-track"></span></span>
-      </label>
+      <label class="opt-row"><span class="opt-label">Pulse Animation</span><span class="toggle"><input type="checkbox" id="tog-pulse" checked><span class="toggle-track"></span></span></label>
+      <label class="opt-row"><span class="opt-label">Wireframe Bones</span><span class="toggle"><input type="checkbox" id="tog-wire"><span class="toggle-track"></span></span></label>
+      <label class="opt-row"><span class="opt-label">Scan Line</span><span class="toggle"><input type="checkbox" id="tog-scan" checked><span class="toggle-track"></span></span></label>
     </div>
-
   </div>
 </div>
 
+<!-- Record Panel -->
+<div id="rec-panel">
+  <div id="rec-header">
+    <span id="rec-title">● RECORD</span>
+    <span id="rec-status"><span id="rec-dot"></span><span id="rec-status-text">READY</span></span>
+  </div>
+  <div id="rec-body">
+    <div id="dur-row">
+      <button class="dur-btn active" data-sec="5">5s</button>
+      <button class="dur-btn" data-sec="10">10s</button>
+      <button class="dur-btn" data-sec="15">15s</button>
+      <button class="dur-btn" data-sec="30">30s</button>
+      <button class="dur-btn" data-sec="0">∞</button>
+    </div>
+    <div id="rec-progress-wrap"><div id="rec-progress-bar"></div></div>
+    <div id="rec-info">
+      <div id="rec-timer">00:00</div>
+      <div id="rec-frames">
+        <div id="rec-frame-count">0 FRAMES</div>
+        <div id="rec-fps-disp">~ fps</div>
+      </div>
+    </div>
+    <button id="rec-btn">⏺ START RECORDING</button>
+    <button id="export-btn">⬇ EXPORT FOR BLENDER</button>
+    <div id="rec-hint">Records smoothed landmark positions<br>Exports as ZIP with Blender .py script</div>
+  </div>
+</div>
+
+<!-- Export Modal -->
+<div id="export-modal">
+  <div id="export-box">
+    <h2>EXPORT READY</h2>
+    <p>YOUR ANIMATION ZIP CONTAINS TWO FILES.<br>DRAG THE .PY INTO BLENDER'S SCRIPT EDITOR AND RUN IT.</p>
+    <div class="export-stat"><span>DURATION</span><span id="ex-duration">-</span></div>
+    <div class="export-stat"><span>FRAMES</span><span id="ex-frames">-</span></div>
+    <div class="export-stat"><span>AVG FPS</span><span id="ex-fps">-</span></div>
+    <div class="export-stat"><span>LANDMARKS / FRAME</span><span>21</span></div>
+    <div class="file-list">
+      <div class="file-item">
+        <span class="file-icon">📄</span>
+        <div><div class="file-name">hand_animation.json</div><div class="file-desc">Raw landmark positions, timestamps, metadata</div></div>
+      </div>
+      <div class="file-item">
+        <span class="file-icon">🐍</span>
+        <div><div class="file-name">import_hand_blender.py</div><div class="file-desc">Run in Blender Script Editor → creates keyframed empties</div></div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-btn primary" id="download-btn">⬇ DOWNLOAD ZIP</button>
+      <button class="modal-btn secondary" id="modal-close-btn">CLOSE</button>
+    </div>
+  </div>
+</div>
+
+<!-- Bottom bar -->
 <div id="bottom-bar">
   <span>LANDMARKS: <span id="landmark-count">0</span>/21</span>
   <span>FINGERS: <span id="finger-count">-</span></span>
@@ -317,38 +460,34 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1640029074/camera_utils.js" crossorigin="anonymous"></script>
 
 <script>
 // ─── OPTIONS ───────────────────────────────────────────────────────
 const opts = {
-  smoothAlpha: 0.18,  // lerp per frame: 0.02 = very smooth/laggy, 1.0 = raw
+  smoothAlpha: 0.18,
   scale: 1.20,
-  showJoints: true,
-  showBones: true,
-  showTips: true,
-  showParticles: true,
-  showCam: true,
-  pulseAnim: true,
-  wireframeBones: false,
-  scanLine: true,
+  showJoints: true, showBones: true, showTips: true,
+  showParticles: true, showCam: true,
+  pulseAnim: true, wireframeBones: false, scanLine: true,
 };
 
 // ─── THREE SETUP ───────────────────────────────────────────────────
 const container = document.getElementById('canvas-container');
-const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+const renderer  = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 container.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-const cam = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.01, 100);
+const cam   = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.01, 100);
 cam.position.set(0, 0, 1.4);
 
 scene.add(new THREE.AmbientLight(0x001122, 0.5));
-const rimLight = new THREE.DirectionalLight(0x00ffe7, 1.2);
+const rimLight  = new THREE.DirectionalLight(0x00ffe7, 1.2);
 rimLight.position.set(-2, 2, 1); scene.add(rimLight);
 const pinkLight = new THREE.PointLight(0xff00aa, 1.5, 3);
 pinkLight.position.set(1, -1, 0.5); scene.add(pinkLight);
@@ -364,24 +503,20 @@ const CONNECTIONS = [
   [0,17],[17,18],[18,19],[19,20],
   [5,9],[9,13],[13,17],[5,17]
 ];
-const TIPS = new Set([4, 8, 12, 16, 20]);
+const TIPS = new Set([4,8,12,16,20]);
 
 const jointMeshes = [];
 for (let i = 0; i < 21; i++) {
   const isTip = TIPS.has(i);
-  const geo = new THREE.SphereGeometry(isTip ? 0.016 : 0.010, 16, 12);
-  const mat = new THREE.MeshStandardMaterial({
-    color:            isTip ? 0xff00aa : 0x00ffe7,
-    emissive:         isTip ? 0xff00aa : 0x00ffe7,
-    emissiveIntensity: isTip ? 0.8 : 0.4,
-    metalness: 0.6, roughness: 0.2,
+  const geo   = new THREE.SphereGeometry(isTip ? 0.016 : 0.010, 16, 12);
+  const mat   = new THREE.MeshStandardMaterial({
+    color: isTip ? 0xff00aa : 0x00ffe7, emissive: isTip ? 0xff00aa : 0x00ffe7,
+    emissiveIntensity: isTip ? 0.8 : 0.4, metalness: 0.6, roughness: 0.2,
     transparent: true, opacity: 0.95,
   });
   const mesh = new THREE.Mesh(geo, mat);
-  mesh.visible = false;
-  mesh._isTip = isTip;
-  scene.add(mesh);
-  jointMeshes.push(mesh);
+  mesh.visible = false; mesh._isTip = isTip;
+  scene.add(mesh); jointMeshes.push(mesh);
 }
 
 const boneMeshes = [];
@@ -390,40 +525,32 @@ for (let i = 0; i < CONNECTIONS.length; i++) {
   geo.translate(0, 0.5, 0);
   const mat = new THREE.MeshStandardMaterial({
     color: 0x00c8b8, emissive: 0x00ffe7, emissiveIntensity: 0.15,
-    metalness: 0.8, roughness: 0.3,
-    transparent: true, opacity: 0.75, wireframe: false,
+    metalness: 0.8, roughness: 0.3, transparent: true, opacity: 0.75, wireframe: false,
   });
   const mesh = new THREE.Mesh(geo, mat);
-  mesh.visible = false;
-  scene.add(mesh);
-  boneMeshes.push(mesh);
+  mesh.visible = false; scene.add(mesh); boneMeshes.push(mesh);
 }
 
 const glowGeo = new THREE.BufferGeometry();
 const glowPos = new Float32Array(21 * 3);
 glowGeo.setAttribute('position', new THREE.BufferAttribute(glowPos, 3));
-const glowMat = new THREE.PointsMaterial({
+const glowPoints = new THREE.Points(glowGeo, new THREE.PointsMaterial({
   color: 0x00ffe7, size: 0.03, transparent: true, opacity: 0.3,
   blending: THREE.AdditiveBlending, depthWrite: false,
-});
-const glowPoints = new THREE.Points(glowGeo, glowMat);
-glowPoints.visible = false;
-scene.add(glowPoints);
+}));
+glowPoints.visible = false; scene.add(glowPoints);
 
 // ─── SMOOTHING STATE ───────────────────────────────────────────────
 const rawPos    = Array.from({length:21}, () => new THREE.Vector3());
 const smoothPos = Array.from({length:21}, () => new THREE.Vector3());
 let hasFirstFrame = false;
-let handDetected = false;
-const _tmpVec = new THREE.Vector3();
+let handDetected  = false;
+const _tmpVec     = new THREE.Vector3();
 
 function applySmoothing() {
   for (let i = 0; i < 21; i++) {
-    if (!hasFirstFrame) {
-      smoothPos[i].copy(rawPos[i]);
-    } else {
-      smoothPos[i].lerp(rawPos[i], opts.smoothAlpha);
-    }
+    if (!hasFirstFrame) smoothPos[i].copy(rawPos[i]);
+    else smoothPos[i].lerp(rawPos[i], opts.smoothAlpha);
   }
   hasFirstFrame = true;
 }
@@ -447,7 +574,109 @@ function mapLandmark(lm) {
   );
 }
 
-// ─── MEDIAPIPE RESULTS ─────────────────────────────────────────────
+// ─── RECORDING STATE ───────────────────────────────────────────────
+let isRecording      = false;
+let recordedFrames   = [];
+let recStartTime     = 0;
+let recDurationSec   = 5;      // 0 = unlimited
+let recTimerInterval = null;
+let lastRecordedTime = 0;
+let recFPS           = 0;
+const TARGET_REC_FPS = 30;     // Max record fps
+const MIN_FRAME_MS   = 1000 / TARGET_REC_FPS;
+
+function startRecording() {
+  recordedFrames = [];
+  recStartTime   = performance.now();
+  lastRecordedTime = 0;
+  isRecording    = true;
+
+  document.getElementById('rec-btn').textContent   = '⏹ STOP RECORDING';
+  document.getElementById('rec-btn').classList.add('stop');
+  document.getElementById('rec-dot').classList.add('recording');
+  document.getElementById('rec-status-text').textContent = 'REC';
+  document.getElementById('rec-timer').classList.add('active');
+  document.getElementById('export-btn').classList.remove('visible');
+  document.getElementById('video').classList.add('recording-border');
+
+  // Disable duration buttons
+  document.querySelectorAll('.dur-btn').forEach(b => b.disabled = true);
+
+  // Timer interval (UI update)
+  recTimerInterval = setInterval(updateRecTimer, 100);
+}
+
+function stopRecording() {
+  isRecording = false;
+  clearInterval(recTimerInterval);
+
+  const elapsed = (performance.now() - recStartTime) / 1000;
+  recFPS = recordedFrames.length / elapsed;
+
+  document.getElementById('rec-btn').textContent = '⏺ START RECORDING';
+  document.getElementById('rec-btn').classList.remove('stop');
+  document.getElementById('rec-dot').classList.remove('recording');
+  document.getElementById('rec-dot').classList.add('ready');
+  document.getElementById('rec-status-text').textContent = 'DONE';
+  document.getElementById('rec-timer').classList.remove('active');
+  document.getElementById('video').classList.remove('recording-border');
+  document.getElementById('rec-progress-bar').style.width = '100%';
+  document.querySelectorAll('.dur-btn').forEach(b => b.disabled = false);
+
+  if (recordedFrames.length > 0) {
+    document.getElementById('export-btn').classList.add('visible');
+    document.getElementById('rec-hint').textContent = `✓ ${recordedFrames.length} frames captured (${recFPS.toFixed(1)} fps)`;
+  }
+}
+
+function updateRecTimer() {
+  if (!isRecording) return;
+  const elapsed = (performance.now() - recStartTime) / 1000;
+  const mins    = Math.floor(elapsed / 60);
+  const secs    = Math.floor(elapsed % 60);
+  const tenths  = Math.floor((elapsed * 10) % 10);
+
+  document.getElementById('rec-timer').textContent =
+    String(mins).padStart(2,'0') + ':' + String(secs).padStart(2,'0');
+  document.getElementById('rec-frame-count').textContent =
+    recordedFrames.length + ' FRAMES';
+  if (elapsed > 0)
+    document.getElementById('rec-fps-disp').textContent =
+      (recordedFrames.length / elapsed).toFixed(1) + ' fps';
+
+  // Progress bar (only if limited duration)
+  if (recDurationSec > 0) {
+    document.getElementById('rec-progress-bar').style.width =
+      Math.min(100, (elapsed / recDurationSec) * 100) + '%';
+  }
+
+  // Auto-stop
+  if (recDurationSec > 0 && elapsed >= recDurationSec) {
+    stopRecording();
+  }
+}
+
+// Called every MediaPipe frame when recording
+function captureFrame(timestamp) {
+  if (!isRecording) return;
+
+  const now = performance.now();
+  // Throttle to ~TARGET_REC_FPS
+  if (lastRecordedTime && (now - lastRecordedTime) < MIN_FRAME_MS) return;
+  lastRecordedTime = now;
+
+  const elapsed = (now - recStartTime) / 1000;
+  recordedFrames.push({
+    time: parseFloat(elapsed.toFixed(4)),
+    landmarks: smoothPos.map(v => [
+      parseFloat(v.x.toFixed(5)),
+      parseFloat(v.y.toFixed(5)),
+      parseFloat(v.z.toFixed(5))
+    ])
+  });
+}
+
+// ─── MEDIAPIPE ─────────────────────────────────────────────────────
 function onResults(results) {
   document.getElementById('mp-dot').classList.add('active');
 
@@ -459,8 +688,8 @@ function onResults(results) {
 
     handDetected = true;
     document.getElementById('landmark-count').textContent = '21';
-    document.getElementById('finger-count').textContent  = countFingers(lms);
-    document.getElementById('hand-label').textContent     = label;
+    document.getElementById('finger-count').textContent   = countFingers(lms);
+    document.getElementById('hand-label').textContent      = label;
     document.getElementById('detect-dot').classList.add('active');
   } else {
     handDetected  = false;
@@ -471,18 +700,15 @@ function onResults(results) {
     document.getElementById('detect-dot').classList.remove('active');
     document.getElementById('landmark-count').textContent = '0';
     document.getElementById('finger-count').textContent   = '-';
-    document.getElementById('hand-label').textContent     = '-';
+    document.getElementById('hand-label').textContent      = '-';
   }
 }
 
 function countFingers(lms) {
-  const tips = [4, 8, 12, 16, 20];
-  const pips = [3, 6, 10, 14, 18];
-  let count = lms[4].x < lms[3].x ? 1 : 0;
-  for (let i = 1; i < 5; i++) {
-    if (lms[tips[i]].y < lms[pips[i]].y) count++;
-  }
-  return count;
+  const tips = [4,8,12,16,20], pips = [3,6,10,14,18];
+  let c = lms[4].x < lms[3].x ? 1 : 0;
+  for (let i = 1; i < 5; i++) if (lms[tips[i]].y < lms[pips[i]].y) c++;
+  return c;
 }
 
 // ─── SETTINGS PANEL ────────────────────────────────────────────────
@@ -490,14 +716,14 @@ const settingsBtn   = document.getElementById('settings-btn');
 const settingsPanel = document.getElementById('settings-panel');
 let panelOpen = false;
 
-settingsBtn.addEventListener('click', (e) => {
+settingsBtn.addEventListener('click', e => {
   e.stopPropagation();
   panelOpen = !panelOpen;
   settingsPanel.classList.toggle('open', panelOpen);
   settingsBtn.classList.toggle('open', panelOpen);
   settingsBtn.textContent = panelOpen ? '✕ CLOSE' : '⚙ SETTINGS';
 });
-document.addEventListener('click', (e) => {
+document.addEventListener('click', e => {
   if (panelOpen && !settingsPanel.contains(e.target) && e.target !== settingsBtn) {
     panelOpen = false;
     settingsPanel.classList.remove('open');
@@ -507,7 +733,6 @@ document.addEventListener('click', (e) => {
 });
 settingsPanel.addEventListener('click', e => e.stopPropagation());
 
-// Slider helper
 function initSlider(sliderId, fillId, valId, key, min, max, fmt, onChange) {
   const slider = document.getElementById(sliderId);
   const fill   = document.getElementById(fillId);
@@ -520,45 +745,266 @@ function initSlider(sliderId, fillId, valId, key, min, max, fmt, onChange) {
     if (onChange) onChange(v);
   };
   slider.addEventListener('input', update);
-  update(); // init display
+  update();
 }
-
 function smoothLabel(v) {
-  // alpha close to 1 = raw (no smooth), close to 0 = max smooth
-  if (v >= 0.8)  return 'RAW';
-  if (v >= 0.5)  return 'LOW';
-  if (v >= 0.2)  return 'MED';
+  if (v >= 0.8) return 'RAW';
+  if (v >= 0.5) return 'LOW';
+  if (v >= 0.2) return 'MED';
   return 'HIGH';
 }
+initSlider('smooth-slider', 'smooth-fill', 'smooth-val', 'smoothAlpha', 0.02, 1.0, smoothLabel,
+  v => { document.getElementById('smooth-disp').textContent = smoothLabel(v); });
+initSlider('scale-slider', 'scale-fill', 'scale-val', 'scale', 0.5, 2.5, v => v.toFixed(2));
 
-initSlider('smooth-slider', 'smooth-fill', 'smooth-val',
-  'smoothAlpha', 0.02, 1.0,
-  v => smoothLabel(v),
-  v => { document.getElementById('smooth-disp').textContent = smoothLabel(v); }
-);
-initSlider('scale-slider', 'scale-fill', 'scale-val',
-  'scale', 0.5, 2.5,
-  v => v.toFixed(2)
-);
-
-// Toggle helper
 function initToggle(id, key, onChange) {
   const el = document.getElementById(id);
-  el.addEventListener('change', () => {
-    opts[key] = el.checked;
-    if (onChange) onChange(el.checked);
-  });
+  el.addEventListener('change', () => { opts[key] = el.checked; if (onChange) onChange(el.checked); });
 }
-
 initToggle('tog-joints', 'showJoints');
 initToggle('tog-bones',  'showBones', v => { if (!v) boneMeshes.forEach(m => m.visible = false); });
-initToggle('tog-tips',   'showTips');
+initToggle('tog-tips', 'showTips');
 initToggle('tog-particles', 'showParticles', v => { if (!v) glowPoints.visible = false; });
 initToggle('tog-cam', 'showCam', v => document.getElementById('video').classList.toggle('hidden', !v));
 initToggle('tog-pulse', 'pulseAnim');
 initToggle('tog-wire', 'wireframeBones', v => boneMeshes.forEach(m => m.material.wireframe = v));
-initToggle('tog-scan', 'scanLine', v => {
-  document.getElementById('scan-line').style.display = v ? '' : 'none';
+initToggle('tog-scan', 'scanLine', v => { document.getElementById('scan-line').style.display = v ? '' : 'none'; });
+
+// ─── RECORD PANEL CONTROLS ─────────────────────────────────────────
+document.querySelectorAll('.dur-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (isRecording) return;
+    document.querySelectorAll('.dur-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    recDurationSec = parseInt(btn.dataset.sec);
+    document.getElementById('rec-progress-bar').style.width = '0%';
+  });
+});
+
+document.getElementById('rec-btn').addEventListener('click', () => {
+  if (!isRecording) startRecording();
+  else stopRecording();
+});
+
+// ─── BLENDER PYTHON SCRIPT GENERATOR ──────────────────────────────
+function generateBlenderScript(jsonFilename) {
+  return `# ═══════════════════════════════════════════════════════════════════
+# HAND TRACKING — BLENDER IMPORT SCRIPT
+# Generated by Hand.Track 3D
+#
+# HOW TO USE:
+#   1. Extract the ZIP, place this .py next to hand_animation.json
+#   2. In Blender: Scripting workspace → Open this file → Run Script
+#   3. The hand animation will appear in a new "HandTracking" collection
+#
+# REQUIREMENTS: Blender 3.0+ (uses bpy)
+# ═══════════════════════════════════════════════════════════════════
+
+import bpy
+import json
+import os
+import math
+from mathutils import Vector
+
+# ── CONFIG ───────────────────────────────────────────────────────────
+# The JSON file should be in the same folder as this script.
+# If it isn't, set the full path below.
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+JSON_PATH  = os.path.join(SCRIPT_DIR, "${jsonFilename}")
+
+# Scale factor: Three.js units → Blender meters (1.0 = keep as-is)
+SCALE = 1.0
+
+# ── LANDMARK NAMES ────────────────────────────────────────────────────
+NAMES = [
+    "Wrist",
+    "Thumb_CMC",  "Thumb_MCP",  "Thumb_IP",  "Thumb_Tip",
+    "Index_MCP",  "Index_PIP",  "Index_DIP",  "Index_Tip",
+    "Middle_MCP", "Middle_PIP", "Middle_DIP", "Middle_Tip",
+    "Ring_MCP",   "Ring_PIP",   "Ring_DIP",   "Ring_Tip",
+    "Pinky_MCP",  "Pinky_PIP",  "Pinky_DIP",  "Pinky_Tip",
+]
+
+# Visual connections (for reference / custom use)
+CONNECTIONS = [
+    (0,1),(1,2),(2,3),(3,4),
+    (0,5),(5,6),(6,7),(7,8),
+    (0,9),(9,10),(10,11),(11,12),
+    (0,13),(13,14),(14,15),(15,16),
+    (0,17),(17,18),(18,19),(19,20),
+    (5,9),(9,13),(13,17),(5,17),
+]
+
+# ── COORDINATE CONVERSION ─────────────────────────────────────────────
+# Three.js  →  Blender
+#   X right    X right
+#   Y up       Z up
+#   Z forward  -Y forward
+def to_blender(x, y, z):
+    return Vector((x * SCALE, -z * SCALE, y * SCALE))
+
+# ── LOAD JSON ─────────────────────────────────────────────────────────
+if not os.path.exists(JSON_PATH):
+    raise FileNotFoundError(f"Could not find: {JSON_PATH}\\nEdit JSON_PATH at the top of this script.")
+
+with open(JSON_PATH, "r") as f:
+    data = json.load(f)
+
+fps        = data.get("fps", 30)
+rec_frames = data["frames"]
+n_frames   = len(rec_frames)
+duration   = data.get("duration", n_frames / fps)
+
+print(f"\\n▶ Loading hand animation: {n_frames} frames, {fps} FPS, {duration:.2f}s")
+
+# ── SCENE SETUP ───────────────────────────────────────────────────────
+scene = bpy.context.scene
+scene.render.fps       = fps
+scene.frame_start      = 1
+scene.frame_end        = n_frames
+scene.frame_current    = 1
+
+# Clean up previous import
+if "HandTracking" in bpy.data.collections:
+    old_col = bpy.data.collections["HandTracking"]
+    for obj in list(old_col.objects):
+        bpy.data.objects.remove(obj, do_unlink=True)
+    bpy.data.collections.remove(old_col)
+
+col = bpy.data.collections.new("HandTracking")
+scene.collection.children.link(col)
+
+# ── CREATE JOINT EMPTIES ──────────────────────────────────────────────
+print("▶ Creating joint empties...")
+empties = []
+tips    = {4, 8, 12, 16, 20}
+
+for i, name in enumerate(NAMES):
+    bpy.ops.object.empty_add(type="SPHERE", location=(0, 0, 0))
+    obj = bpy.context.active_object
+    obj.name = f"Hand_{name}"
+    obj.empty_display_size = 0.012 if i in tips else 0.008
+
+    # Color-code fingertips
+    if i in tips:
+        obj.color = (1.0, 0.0, 0.67, 1.0)  # magenta
+    else:
+        obj.color = (0.0, 1.0, 0.91, 1.0)  # cyan
+
+    # Move to our collection
+    for c in list(obj.users_collection):
+        c.objects.unlink(obj)
+    col.objects.link(obj)
+    empties.append(obj)
+
+# ── KEYFRAME POSITIONS ────────────────────────────────────────────────
+print("▶ Inserting keyframes...")
+for fi, frame_data in enumerate(rec_frames):
+    blender_frame = fi + 1
+    lms = frame_data["landmarks"]
+
+    for i, obj in enumerate(empties):
+        x, y, z  = lms[i]
+        obj.location = to_blender(x, y, z)
+        obj.keyframe_insert(data_path="location", frame=blender_frame)
+
+    if fi % 50 == 0:
+        print(f"  {fi + 1}/{n_frames} frames processed...")
+
+# ── SET INTERPOLATION TO LINEAR ───────────────────────────────────────
+# Prevent Bezier overshoot on fast movements
+for obj in empties:
+    if obj.animation_data and obj.animation_data.action:
+        for fcurve in obj.animation_data.action.fcurves:
+            for kp in fcurve.keyframe_points:
+                kp.interpolation = "LINEAR"
+
+# ── SUMMARY ───────────────────────────────────────────────────────────
+print(f"\\n✓ Done!")
+print(f"  Collection  : HandTracking")
+print(f"  Joints      : {len(empties)} empties")
+print(f"  Keyframes   : {n_frames} per joint")
+print(f"  Timeline    : frames 1 – {n_frames} at {fps} fps")
+print(f"\\nTip: Use these empties as IK targets or Copy Location constraints")
+print(f"     on a rigged hand armature for full bone animation.")
+`;
+}
+
+// ─── EXPORT ZIP ────────────────────────────────────────────────────
+document.getElementById('export-btn').addEventListener('click', () => {
+  if (recordedFrames.length === 0) return;
+  const elapsed = recordedFrames[recordedFrames.length - 1].time;
+  const fps     = recordedFrames.length / elapsed;
+
+  document.getElementById('ex-duration').textContent = elapsed.toFixed(2) + 's';
+  document.getElementById('ex-frames').textContent   = recordedFrames.length;
+  document.getElementById('ex-fps').textContent      = fps.toFixed(1);
+  document.getElementById('export-modal').classList.add('visible');
+});
+
+document.getElementById('download-btn').addEventListener('click', async () => {
+  const elapsed  = recordedFrames[recordedFrames.length - 1]?.time || 0;
+  const fps      = Math.round(recordedFrames.length / elapsed) || 30;
+  const jsonName = 'hand_animation.json';
+
+  const jsonData = {
+    version:    '1.0',
+    generator:  'Hand.Track 3D',
+    fps,
+    frameCount: recordedFrames.length,
+    duration:   parseFloat(elapsed.toFixed(3)),
+    landmarks:  21,
+    coordSystem: {
+      description: 'Three.js world space, Y-up, centered',
+      conversion:  'Blender: X=X, Y=-Z, Z=Y (multiply by desired scale)',
+    },
+    frames: recordedFrames,
+  };
+
+  const zip = new JSZip();
+  zip.file(jsonName,              JSON.stringify(jsonData, null, 2));
+  zip.file('import_hand_blender.py', generateBlenderScript(jsonName));
+
+  // Add a README
+  zip.file('README.txt', [
+    'HAND.TRACK 3D — BLENDER EXPORT',
+    '================================',
+    '',
+    'Files:',
+    '  hand_animation.json      — Animation data (21 landmarks × N frames)',
+    '  import_hand_blender.py   — Blender import script',
+    '',
+    'How to import in Blender:',
+    '  1. Extract this ZIP to a folder',
+    '  2. Open Blender (3.0+)',
+    '  3. Go to the "Scripting" workspace',
+    '  4. Click "Open" and select import_hand_blender.py',
+    '  5. Click "Run Script" (▶)',
+    '  6. A "HandTracking" collection will appear with 21 keyframed empties',
+    '  7. Play the animation (Spacebar) to preview',
+    '',
+    'Tip for rigged hand animation:',
+    '  - Add a hand armature (e.g. Rigify Hand)',
+    '  - Use Copy Location constraints on each bone targeting these empties',
+    '  - Or use the empties as IK targets',
+    '',
+    `Recorded: ${new Date().toLocaleString()}`,
+    `Frames: ${recordedFrames.length}  |  Duration: ${elapsed.toFixed(2)}s  |  FPS: ${fps}`,
+  ].join('\n'));
+
+  const blob = await zip.generateAsync({ type: 'blob' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `hand_track_${Date.now()}.zip`;
+  a.click();
+  URL.revokeObjectURL(url);
+
+  document.getElementById('export-modal').classList.remove('visible');
+});
+
+document.getElementById('modal-close-btn').addEventListener('click', () => {
+  document.getElementById('export-modal').classList.remove('visible');
 });
 
 // ─── RENDER LOOP ───────────────────────────────────────────────────
@@ -569,6 +1015,9 @@ function animate() {
 
   if (handDetected) {
     applySmoothing();
+
+    // Capture frame if recording
+    if (isRecording) captureFrame(t);
 
     for (let i = 0; i < 21; i++) {
       const m = jointMeshes[i];
@@ -584,33 +1033,26 @@ function animate() {
   } else {
     cam.position.x = Math.sin(t * 0.3) * 0.05;
     cam.position.y = Math.cos(t * 0.2) * 0.03;
+    if (isRecording) stopRecording(); // Auto-stop if hand lost
   }
 
   if (opts.pulseAnim) {
-    pinkLight.intensity = 1.2 + Math.sin(t * 2) * 0.3;
-    fillLight.intensity = 0.6 + Math.cos(t * 1.5) * 0.2;
+    pinkLight.intensity = 1.2 + Math.sin(t*2) * 0.3;
+    fillLight.intensity = 0.6 + Math.cos(t*1.5) * 0.2;
     if (handDetected) {
-      boneMeshes.forEach((m, i) => {
-        if (m.visible) m.material.emissiveIntensity = 0.1 + Math.sin(t*3 + i*0.4) * 0.08;
-      });
-      jointMeshes.forEach((m, i) => {
-        if (m.visible) m.material.emissiveIntensity = 0.3 + Math.sin(t*4 + i*0.5) * 0.15;
-      });
+      boneMeshes.forEach((m,i) => { if (m.visible) m.material.emissiveIntensity = 0.1 + Math.sin(t*3+i*0.4)*0.08; });
+      jointMeshes.forEach((m,i) => { if (m.visible) m.material.emissiveIntensity = 0.3 + Math.sin(t*4+i*0.5)*0.15; });
     }
   }
 
-  cam.lookAt(0, 0, 0);
+  cam.lookAt(0,0,0);
   renderer.render(scene, cam);
 }
 
 // ─── INIT ──────────────────────────────────────────────────────────
-const loaderBar    = document.getElementById('loader-bar');
-const loaderMsg    = document.getElementById('loader-msg');
-const loadingScreen = document.getElementById('loading-screen');
-
 function setProgress(pct, msg) {
-  loaderBar.style.width = pct + '%';
-  loaderMsg.textContent = msg;
+  document.getElementById('loader-bar').style.width = pct + '%';
+  document.getElementById('loader-msg').textContent = msg;
 }
 
 async function init() {
@@ -619,9 +1061,7 @@ async function init() {
 
   setProgress(30, 'REQUESTING CAMERA ACCESS...');
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { width: 640, height: 480, facingMode: 'user' }
-    });
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: 'user' } });
     document.getElementById('video').srcObject = stream;
     document.getElementById('cam-dot').classList.add('active');
     setProgress(55, 'CAMERA ACTIVE');
@@ -636,10 +1076,7 @@ async function init() {
   const hands = new Hands({
     locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${f}`
   });
-  hands.setOptions({
-    maxNumHands: 1, modelComplexity: 1,
-    minDetectionConfidence: 0.7, minTrackingConfidence: 0.6,
-  });
+  hands.setOptions({ maxNumHands:1, modelComplexity:1, minDetectionConfidence:0.7, minTrackingConfidence:0.6 });
   hands.onResults(onResults);
 
   setProgress(88, 'STARTING CAMERA PIPELINE...');
@@ -653,7 +1090,7 @@ async function init() {
   setProgress(100, 'READY');
   document.getElementById('status-text').textContent = 'LIVE';
   await new Promise(r => setTimeout(r, 400));
-  loadingScreen.classList.add('hidden');
+  document.getElementById('loading-screen').classList.add('hidden');
 }
 
 window.addEventListener('resize', () => {
