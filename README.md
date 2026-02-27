@@ -46,7 +46,7 @@ A **single HTML file** that turns your webcam into a real-time 3D hand motion ca
 4. Done.
 ```
 
-Or visit the **[live demo →](https://YOUR-USERNAME.github.io/hand-tracking/)**
+Or visit the **[live demo →](https://alxandrb.github.io/Threejs-Hand-Tracker/)**
 
 > ⚠️ Requires HTTPS or localhost for camera access. GitHub Pages handles this automatically.
 
