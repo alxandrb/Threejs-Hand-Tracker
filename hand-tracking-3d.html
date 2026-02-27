@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Hand Tracking 3D</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;600&display=swap');
+
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --cyan: #00ffe7;
+    --magenta: #ff00aa;
+    --dark: #050a0f;
+    --grid: rgba(0,255,231,0.04);
+  }
+
+  body {
+    background: var(--dark);
+    color: var(--cyan);
+    font-family: 'Share Tech Mono', monospace;
+    overflow: hidden;
+    height: 100vh; width: 100vw;
+  }
+
+  #bg-grid {
+    position: fixed; inset: 0; z-index: 0;
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+  }
+
+  #canvas-container { position: fixed; inset: 0; z-index: 1; }
+
+  #video {
+    position: fixed; bottom: 20px; right: 20px;
+    width: 200px; height: 150px;
+    border: 1px solid rgba(0,255,231,0.3);
+    border-radius: 4px; z-index: 10;
+    object-fit: cover; transform: scaleX(-1); opacity: 0.7;
+    transition: opacity 0.4s, transform 0.4s;
+  }
+  #video.hidden { opacity: 0 !important; pointer-events: none; transform: scaleX(-1) scale(0.85); }
+
+  #ui {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 10;
+    display: flex; align-items: flex-start; justify-content: space-between;
+    padding: 20px 28px; pointer-events: none;
+  }
+
+  #title {
+    font-family: 'Rajdhani', sans-serif; font-weight: 600;
+    font-size: 22px; letter-spacing: 6px; text-transform: uppercase;
+    color: var(--cyan); text-shadow: 0 0 20px var(--cyan);
+  }
+  #title span { color: var(--magenta); text-shadow: 0 0 20px var(--magenta); }
+
+  #status-panel { font-size: 11px; line-height: 1.9; color: rgba(0,255,231,0.6); text-align: right; }
+  .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #333; margin-right: 6px; vertical-align: middle; }
+  .dot.active { background: var(--cyan); box-shadow: 0 0 8px var(--cyan); animation: blink 1.2s ease-in-out infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+  /* ─── SETTINGS BUTTON ─── */
+  #settings-btn {
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+    z-index: 20; background: rgba(5,14,20,0.7);
+    border: 1px solid rgba(0,255,231,0.22);
+    color: rgba(0,255,231,0.5); font-family: 'Share Tech Mono', monospace;
+    font-size: 10px; letter-spacing: 3px; padding: 7px 20px;
+    cursor: pointer; text-transform: uppercase;
+    transition: all 0.2s; backdrop-filter: blur(6px);
+    white-space: nowrap;
+  }
+  #settings-btn:hover { border-color: var(--cyan); color: var(--cyan); box-shadow: 0 0 14px rgba(0,255,231,0.2); }
+  #settings-btn.open { border-color: var(--magenta); color: var(--magenta); box-shadow: 0 0 14px rgba(255,0,170,0.25); }
+
+  /* ─── SETTINGS PANEL ─── */
+  #settings-panel {
+    position: fixed; top: 58px; left: 50%; transform: translateX(-50%);
+    z-index: 19; width: 340px;
+    background: rgba(4, 12, 18, 0.95);
+    border: 1px solid rgba(0,255,231,0.12);
+    backdrop-filter: blur(20px);
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height 0.38s cubic-bezier(.4,0,.2,1), border-color 0.2s;
+    box-shadow: 0 12px 50px rgba(0,0,0,0.7);
+  }
+  #settings-panel.open { max-height: 700px; border-color: rgba(0,255,231,0.25); }
+
+  .panel-inner { padding: 16px 22px 22px; }
+  .panel-section { margin-bottom: 20px; }
+  .panel-section:last-child { margin-bottom: 0; }
+
+  .section-label {
+    font-size: 9px; letter-spacing: 4px; color: rgba(0,255,231,0.3);
+    text-transform: uppercase; margin-bottom: 10px;
+    border-bottom: 1px solid rgba(0,255,231,0.07); padding-bottom: 6px;
+  }
+
+  /* ── Toggle rows ── */
+  .opt-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 5px 0; cursor: pointer;
+  }
+  .opt-row:hover .opt-label { color: rgba(0,255,231,0.9); }
+  .opt-label {
+    font-size: 11px; letter-spacing: 2px;
+    color: rgba(0,255,231,0.5); text-transform: uppercase;
+    user-select: none; transition: color 0.15s;
+  }
+
+  .toggle { position: relative; width: 38px; height: 20px; flex-shrink: 0; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-track {
+    position: absolute; inset: 0;
+    background: rgba(0,255,231,0.06);
+    border: 1px solid rgba(0,255,231,0.18);
+    border-radius: 10px; cursor: pointer;
+    transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+  }
+  .toggle-track::after {
+    content: '';
+    position: absolute; top: 3px; left: 3px;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: rgba(0,255,231,0.3);
+    transition: transform 0.22s ease, background 0.2s;
+  }
+  .toggle input:checked + .toggle-track {
+    background: rgba(0,255,231,0.12);
+    border-color: var(--cyan);
+    box-shadow: 0 0 10px rgba(0,255,231,0.18);
+  }
+  .toggle input:checked + .toggle-track::after {
+    transform: translateX(18px);
+    background: var(--cyan);
+    box-shadow: 0 0 7px var(--cyan);
+  }
+
+  /* ── Sliders ── */
+  .slider-row { padding: 5px 0; }
+  .slider-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+  .slider-label { font-size: 11px; letter-spacing: 2px; color: rgba(0,255,231,0.5); text-transform: uppercase; }
+  .slider-value { font-size: 11px; color: var(--cyan); min-width: 36px; text-align: right; font-weight: bold; }
+
+  .slider-wrap { position: relative; height: 18px; display: flex; align-items: center; }
+  .slider-track { position: absolute; left: 0; right: 0; height: 2px; background: rgba(0,255,231,0.08); border-radius: 1px; }
+  .slider-fill {
+    position: absolute; left: 0; height: 2px;
+    background: linear-gradient(90deg, var(--cyan), var(--magenta));
+    border-radius: 1px; box-shadow: 0 0 6px rgba(0,255,231,0.35);
+    pointer-events: none;
+  }
+  input[type=range] {
+    -webkit-appearance: none;
+    position: relative; width: 100%; height: 18px;
+    background: transparent; cursor: pointer; margin: 0;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--dark); border: 2px solid var(--cyan);
+    box-shadow: 0 0 8px var(--cyan); transition: transform 0.12s, box-shadow 0.12s;
+  }
+  input[type=range]:hover::-webkit-slider-thumb { transform: scale(1.25); box-shadow: 0 0 16px var(--cyan); }
+  input[type=range]::-moz-range-thumb {
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--dark); border: 2px solid var(--cyan);
+    box-shadow: 0 0 8px var(--cyan); cursor: pointer;
+  }
+
+  /* ─── BOTTOM BAR ─── */
+  #bottom-bar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    padding: 12px 28px; font-size: 10px;
+    color: rgba(0,255,231,0.3);
+    display: flex; gap: 28px; z-index: 10;
+    border-top: 1px solid rgba(0,255,231,0.06);
+    letter-spacing: 2px; text-transform: uppercase;
+  }
+  #landmark-count { color: rgba(255,0,170,0.6); }
+
+  /* ─── LOADING ─── */
+  #loading-screen {
+    position: fixed; inset: 0; z-index: 100;
+    background: var(--dark);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 16px;
+    transition: opacity 0.8s ease;
+  }
+  #loading-screen.hidden { opacity: 0; pointer-events: none; }
+  .loader-title {
+    font-family: 'Rajdhani', sans-serif; font-size: 28px;
+    font-weight: 600; letter-spacing: 10px;
+    color: var(--cyan); text-shadow: 0 0 30px var(--cyan);
+  }
+  .loader-bar-wrap { width: 280px; height: 2px; background: rgba(0,255,231,0.1); border-radius: 2px; overflow: hidden; }
+  .loader-bar { height: 100%; width: 0%; background: linear-gradient(90deg, var(--cyan), var(--magenta)); transition: width 0.3s ease; box-shadow: 0 0 10px var(--cyan); }
+  .loader-msg { font-size: 11px; color: rgba(0,255,231,0.5); letter-spacing: 3px; }
+
+  #scan-line {
+    position: fixed; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+    opacity: 0.15; z-index: 2;
+    animation: scan 4s ease-in-out infinite; pointer-events: none;
+  }
+  @keyframes scan { 0%{top:0%} 100%{top:100%} }
+</style>
+</head>
+<body>
+<div id="bg-grid"></div>
+<div id="scan-line" id="scan-line"></div>
+
+<div id="loading-screen">
+  <div class="loader-title">HAND.TRACK</div>
+  <div class="loader-bar-wrap"><div class="loader-bar" id="loader-bar"></div></div>
+  <div class="loader-msg" id="loader-msg">INITIALIZING SYSTEMS...</div>
+</div>
+
+<div id="canvas-container"></div>
+<video id="video" autoplay muted playsinline></video>
+
+<div id="ui">
+  <div><div id="title">HAND<span>.</span>TRACK <span>3D</span></div></div>
+  <div id="status-panel">
+    <div><span class="dot" id="cam-dot"></span>CAMERA</div>
+    <div><span class="dot" id="mp-dot"></span>MEDIAPIPE</div>
+    <div><span class="dot" id="detect-dot"></span>HAND DETECTED</div>
+    <div id="status-text">LOADING...</div>
+  </div>
+</div>
+
+<button id="settings-btn">⚙ SETTINGS</button>
+
+<div id="settings-panel">
+  <div class="panel-inner">
+
+    <div class="panel-section">
+      <div class="section-label">Motion</div>
+
+      <div class="slider-row">
+        <div class="slider-header">
+          <span class="slider-label">Smoothing</span>
+          <span class="slider-value" id="smooth-val">LOW</span>
+        </div>
+        <div class="slider-wrap">
+          <div class="slider-track"></div>
+          <div class="slider-fill" id="smooth-fill" style="width:18%"></div>
+          <input type="range" id="smooth-slider" min="0.02" max="1.0" step="0.01" value="0.18">
+        </div>
+      </div>
+
+      <div class="slider-row" style="margin-top:10px">
+        <div class="slider-header">
+          <span class="slider-label">Scale</span>
+          <span class="slider-value" id="scale-val">1.20</span>
+        </div>
+        <div class="slider-wrap">
+          <div class="slider-track"></div>
+          <div class="slider-fill" id="scale-fill" style="width:35%"></div>
+          <input type="range" id="scale-slider" min="0.5" max="2.5" step="0.05" value="1.20">
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-label">Visibility</div>
+      <label class="opt-row">
+        <span class="opt-label">Joints</span>
+        <span class="toggle"><input type="checkbox" id="tog-joints" checked><span class="toggle-track"></span></span>
+      </label>
+      <label class="opt-row">
+        <span class="opt-label">Bones</span>
+        <span class="toggle"><input type="checkbox" id="tog-bones" checked><span class="toggle-track"></span></span>
+      </label>
+      <label class="opt-row">
+        <span class="opt-label">Fingertip Highlights</span>
+        <span class="toggle"><input type="checkbox" id="tog-tips" checked><span class="toggle-track"></span></span>
+      </label>
+      <label class="opt-row">
+        <span class="opt-label">Particles</span>
+        <span class="toggle"><input type="checkbox" id="tog-particles" checked><span class="toggle-track"></span></span>
+      </label>
+      <label class="opt-row">
+        <span class="opt-label">Camera Feed</span>
+        <span class="toggle"><input type="checkbox" id="tog-cam" checked><span class="toggle-track"></span></span>
+      </label>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-label">Effects</div>
+      <label class="opt-row">
+        <span class="opt-label">Pulse Animation</span>
+        <span class="toggle"><input type="checkbox" id="tog-pulse" checked><span class="toggle-track"></span></span>
+      </label>
+      <label class="opt-row">
+        <span class="opt-label">Wireframe Bones</span>
+        <span class="toggle"><input type="checkbox" id="tog-wire"><span class="toggle-track"></span></span>
+      </label>
+      <label class="opt-row">
+        <span class="opt-label">Scan Line</span>
+        <span class="toggle"><input type="checkbox" id="tog-scan" checked><span class="toggle-track"></span></span>
+      </label>
+    </div>
+
+  </div>
+</div>
+
+<div id="bottom-bar">
+  <span>LANDMARKS: <span id="landmark-count">0</span>/21</span>
+  <span>FINGERS: <span id="finger-count">-</span></span>
+  <span>HAND: <span id="hand-label">-</span></span>
+  <span>SMOOTH: <span id="smooth-disp">LOW</span></span>
+  <span style="margin-left:auto; color: rgba(0,255,231,0.18)">POINT CAMERA AT YOUR HAND</span>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1640029074/camera_utils.js" crossorigin="anonymous"></script>
+
+<script>
+// ─── OPTIONS ───────────────────────────────────────────────────────
+const opts = {
+  smoothAlpha: 0.18,  // lerp per frame: 0.02 = very smooth/laggy, 1.0 = raw
+  scale: 1.20,
+  showJoints: true,
+  showBones: true,
+  showTips: true,
+  showParticles: true,
+  showCam: true,
+  pulseAnim: true,
+  wireframeBones: false,
+  scanLine: true,
+};
+
+// ─── THREE SETUP ───────────────────────────────────────────────────
+const container = document.getElementById('canvas-container');
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+container.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const cam = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.01, 100);
+cam.position.set(0, 0, 1.4);
+
+scene.add(new THREE.AmbientLight(0x001122, 0.5));
+const rimLight = new THREE.DirectionalLight(0x00ffe7, 1.2);
+rimLight.position.set(-2, 2, 1); scene.add(rimLight);
+const pinkLight = new THREE.PointLight(0xff00aa, 1.5, 3);
+pinkLight.position.set(1, -1, 0.5); scene.add(pinkLight);
+const fillLight = new THREE.PointLight(0x00ffe7, 0.8, 3);
+fillLight.position.set(-0.5, 0.5, 1); scene.add(fillLight);
+
+// ─── HAND GEOMETRY ─────────────────────────────────────────────────
+const CONNECTIONS = [
+  [0,1],[1,2],[2,3],[3,4],
+  [0,5],[5,6],[6,7],[7,8],
+  [0,9],[9,10],[10,11],[11,12],
+  [0,13],[13,14],[14,15],[15,16],
+  [0,17],[17,18],[18,19],[19,20],
+  [5,9],[9,13],[13,17],[5,17]
+];
+const TIPS = new Set([4, 8, 12, 16, 20]);
+
+const jointMeshes = [];
+for (let i = 0; i < 21; i++) {
+  const isTip = TIPS.has(i);
+  const geo = new THREE.SphereGeometry(isTip ? 0.016 : 0.010, 16, 12);
+  const mat = new THREE.MeshStandardMaterial({
+    color:            isTip ? 0xff00aa : 0x00ffe7,
+    emissive:         isTip ? 0xff00aa : 0x00ffe7,
+    emissiveIntensity: isTip ? 0.8 : 0.4,
+    metalness: 0.6, roughness: 0.2,
+    transparent: true, opacity: 0.95,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.visible = false;
+  mesh._isTip = isTip;
+  scene.add(mesh);
+  jointMeshes.push(mesh);
+}
+
+const boneMeshes = [];
+for (let i = 0; i < CONNECTIONS.length; i++) {
+  const geo = new THREE.CylinderGeometry(0.005, 0.005, 1, 8);
+  geo.translate(0, 0.5, 0);
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0x00c8b8, emissive: 0x00ffe7, emissiveIntensity: 0.15,
+    metalness: 0.8, roughness: 0.3,
+    transparent: true, opacity: 0.75, wireframe: false,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.visible = false;
+  scene.add(mesh);
+  boneMeshes.push(mesh);
+}
+
+const glowGeo = new THREE.BufferGeometry();
+const glowPos = new Float32Array(21 * 3);
+glowGeo.setAttribute('position', new THREE.BufferAttribute(glowPos, 3));
+const glowMat = new THREE.PointsMaterial({
+  color: 0x00ffe7, size: 0.03, transparent: true, opacity: 0.3,
+  blending: THREE.AdditiveBlending, depthWrite: false,
+});
+const glowPoints = new THREE.Points(glowGeo, glowMat);
+glowPoints.visible = false;
+scene.add(glowPoints);
+
+// ─── SMOOTHING STATE ───────────────────────────────────────────────
+const rawPos    = Array.from({length:21}, () => new THREE.Vector3());
+const smoothPos = Array.from({length:21}, () => new THREE.Vector3());
+let hasFirstFrame = false;
+let handDetected = false;
+const _tmpVec = new THREE.Vector3();
+
+function applySmoothing() {
+  for (let i = 0; i < 21; i++) {
+    if (!hasFirstFrame) {
+      smoothPos[i].copy(rawPos[i]);
+    } else {
+      smoothPos[i].lerp(rawPos[i], opts.smoothAlpha);
+    }
+  }
+  hasFirstFrame = true;
+}
+
+function updateBone(idx, a, b) {
+  const mesh = boneMeshes[idx];
+  _tmpVec.subVectors(b, a);
+  const len = _tmpVec.length();
+  if (len < 0.001) { mesh.visible = false; return; }
+  mesh.position.copy(a);
+  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), _tmpVec.normalize());
+  mesh.scale.set(1, len, 1);
+  mesh.visible = opts.showBones;
+}
+
+function mapLandmark(lm) {
+  return new THREE.Vector3(
+    -(lm.x - 0.5) * opts.scale,
+    -(lm.y - 0.5) * opts.scale,
+    -lm.z * 0.8
+  );
+}
+
+// ─── MEDIAPIPE RESULTS ─────────────────────────────────────────────
+function onResults(results) {
+  document.getElementById('mp-dot').classList.add('active');
+
+  if (results.multiHandLandmarks?.length > 0) {
+    const lms   = results.multiHandLandmarks[0];
+    const label = results.multiHandedness[0]?.label || '-';
+
+    for (let i = 0; i < 21; i++) rawPos[i].copy(mapLandmark(lms[i]));
+
+    handDetected = true;
+    document.getElementById('landmark-count').textContent = '21';
+    document.getElementById('finger-count').textContent  = countFingers(lms);
+    document.getElementById('hand-label').textContent     = label;
+    document.getElementById('detect-dot').classList.add('active');
+  } else {
+    handDetected  = false;
+    hasFirstFrame = false;
+    jointMeshes.forEach(m => m.visible = false);
+    boneMeshes.forEach(m  => m.visible = false);
+    glowPoints.visible = false;
+    document.getElementById('detect-dot').classList.remove('active');
+    document.getElementById('landmark-count').textContent = '0';
+    document.getElementById('finger-count').textContent   = '-';
+    document.getElementById('hand-label').textContent     = '-';
+  }
+}
+
+function countFingers(lms) {
+  const tips = [4, 8, 12, 16, 20];
+  const pips = [3, 6, 10, 14, 18];
+  let count = lms[4].x < lms[3].x ? 1 : 0;
+  for (let i = 1; i < 5; i++) {
+    if (lms[tips[i]].y < lms[pips[i]].y) count++;
+  }
+  return count;
+}
+
+// ─── SETTINGS PANEL ────────────────────────────────────────────────
+const settingsBtn   = document.getElementById('settings-btn');
+const settingsPanel = document.getElementById('settings-panel');
+let panelOpen = false;
+
+settingsBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  panelOpen = !panelOpen;
+  settingsPanel.classList.toggle('open', panelOpen);
+  settingsBtn.classList.toggle('open', panelOpen);
+  settingsBtn.textContent = panelOpen ? '✕ CLOSE' : '⚙ SETTINGS';
+});
+document.addEventListener('click', (e) => {
+  if (panelOpen && !settingsPanel.contains(e.target) && e.target !== settingsBtn) {
+    panelOpen = false;
+    settingsPanel.classList.remove('open');
+    settingsBtn.classList.remove('open');
+    settingsBtn.textContent = '⚙ SETTINGS';
+  }
+});
+settingsPanel.addEventListener('click', e => e.stopPropagation());
+
+// Slider helper
+function initSlider(sliderId, fillId, valId, key, min, max, fmt, onChange) {
+  const slider = document.getElementById(sliderId);
+  const fill   = document.getElementById(fillId);
+  const valEl  = document.getElementById(valId);
+  const update = () => {
+    const v = parseFloat(slider.value);
+    opts[key] = v;
+    valEl.textContent = fmt(v);
+    fill.style.width = ((v - min) / (max - min) * 100) + '%';
+    if (onChange) onChange(v);
+  };
+  slider.addEventListener('input', update);
+  update(); // init display
+}
+
+function smoothLabel(v) {
+  // alpha close to 1 = raw (no smooth), close to 0 = max smooth
+  if (v >= 0.8)  return 'RAW';
+  if (v >= 0.5)  return 'LOW';
+  if (v >= 0.2)  return 'MED';
+  return 'HIGH';
+}
+
+initSlider('smooth-slider', 'smooth-fill', 'smooth-val',
+  'smoothAlpha', 0.02, 1.0,
+  v => smoothLabel(v),
+  v => { document.getElementById('smooth-disp').textContent = smoothLabel(v); }
+);
+initSlider('scale-slider', 'scale-fill', 'scale-val',
+  'scale', 0.5, 2.5,
+  v => v.toFixed(2)
+);
+
+// Toggle helper
+function initToggle(id, key, onChange) {
+  const el = document.getElementById(id);
+  el.addEventListener('change', () => {
+    opts[key] = el.checked;
+    if (onChange) onChange(el.checked);
+  });
+}
+
+initToggle('tog-joints', 'showJoints');
+initToggle('tog-bones',  'showBones', v => { if (!v) boneMeshes.forEach(m => m.visible = false); });
+initToggle('tog-tips',   'showTips');
+initToggle('tog-particles', 'showParticles', v => { if (!v) glowPoints.visible = false; });
+initToggle('tog-cam', 'showCam', v => document.getElementById('video').classList.toggle('hidden', !v));
+initToggle('tog-pulse', 'pulseAnim');
+initToggle('tog-wire', 'wireframeBones', v => boneMeshes.forEach(m => m.material.wireframe = v));
+initToggle('tog-scan', 'scanLine', v => {
+  document.getElementById('scan-line').style.display = v ? '' : 'none';
+});
+
+// ─── RENDER LOOP ───────────────────────────────────────────────────
+let t = 0;
+function animate() {
+  requestAnimationFrame(animate);
+  t += 0.01;
+
+  if (handDetected) {
+    applySmoothing();
+
+    for (let i = 0; i < 21; i++) {
+      const m = jointMeshes[i];
+      m.position.copy(smoothPos[i]);
+      m.visible = opts.showJoints && (m._isTip ? opts.showTips : true);
+      glowPos[i*3]   = smoothPos[i].x;
+      glowPos[i*3+1] = smoothPos[i].y;
+      glowPos[i*3+2] = smoothPos[i].z;
+    }
+    CONNECTIONS.forEach(([a,b], i) => updateBone(i, smoothPos[a], smoothPos[b]));
+    glowGeo.attributes.position.needsUpdate = true;
+    glowPoints.visible = opts.showParticles;
+  } else {
+    cam.position.x = Math.sin(t * 0.3) * 0.05;
+    cam.position.y = Math.cos(t * 0.2) * 0.03;
+  }
+
+  if (opts.pulseAnim) {
+    pinkLight.intensity = 1.2 + Math.sin(t * 2) * 0.3;
+    fillLight.intensity = 0.6 + Math.cos(t * 1.5) * 0.2;
+    if (handDetected) {
+      boneMeshes.forEach((m, i) => {
+        if (m.visible) m.material.emissiveIntensity = 0.1 + Math.sin(t*3 + i*0.4) * 0.08;
+      });
+      jointMeshes.forEach((m, i) => {
+        if (m.visible) m.material.emissiveIntensity = 0.3 + Math.sin(t*4 + i*0.5) * 0.15;
+      });
+    }
+  }
+
+  cam.lookAt(0, 0, 0);
+  renderer.render(scene, cam);
+}
+
+// ─── INIT ──────────────────────────────────────────────────────────
+const loaderBar    = document.getElementById('loader-bar');
+const loaderMsg    = document.getElementById('loader-msg');
+const loadingScreen = document.getElementById('loading-screen');
+
+function setProgress(pct, msg) {
+  loaderBar.style.width = pct + '%';
+  loaderMsg.textContent = msg;
+}
+
+async function init() {
+  setProgress(10, 'INITIALIZING THREE.JS...');
+  await new Promise(r => setTimeout(r, 300));
+
+  setProgress(30, 'REQUESTING CAMERA ACCESS...');
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { width: 640, height: 480, facingMode: 'user' }
+    });
+    document.getElementById('video').srcObject = stream;
+    document.getElementById('cam-dot').classList.add('active');
+    setProgress(55, 'CAMERA ACTIVE');
+  } catch(e) {
+    setProgress(30, 'CAMERA ACCESS DENIED — PLEASE ALLOW');
+    return;
+  }
+
+  setProgress(70, 'LOADING MEDIAPIPE HANDS...');
+  await new Promise(r => setTimeout(r, 400));
+
+  const hands = new Hands({
+    locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${f}`
+  });
+  hands.setOptions({
+    maxNumHands: 1, modelComplexity: 1,
+    minDetectionConfidence: 0.7, minTrackingConfidence: 0.6,
+  });
+  hands.onResults(onResults);
+
+  setProgress(88, 'STARTING CAMERA PIPELINE...');
+  const mpCam = new Camera(document.getElementById('video'), {
+    onFrame: async () => { await hands.send({ image: document.getElementById('video') }); },
+    width: 640, height: 480,
+  });
+  await mpCam.start();
+  document.getElementById('mp-dot').classList.add('active');
+
+  setProgress(100, 'READY');
+  document.getElementById('status-text').textContent = 'LIVE';
+  await new Promise(r => setTimeout(r, 400));
+  loadingScreen.classList.add('hidden');
+}
+
+window.addEventListener('resize', () => {
+  cam.aspect = window.innerWidth / window.innerHeight;
+  cam.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+animate();
+init();
+</script>
+</body>
+</html>
