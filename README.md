@@ -27,8 +27,8 @@ A **single HTML file** that turns your webcam into a real-time 3D hand motion ca
 
 <div align="center">
 
-| 🎯 Track | 💀 Rig | ⏺ Record | 🐍 Export |
-|:--------:|:------:|:---------:|:---------:|
+|       🎯 Track        |          💀 Rig          |      ⏺ Record       |     🐍 Export     |
+| :-------------------: | :----------------------: | :-----------------: | :---------------: |
 | 21 landmarks at 60fps | Instanced joints + bones | Up to 30fps capture | ZIP → Blender .py |
 
 </div>
@@ -76,16 +76,16 @@ The **smoothing lerp** in the render loop bridges the gap — even at 20fps Medi
 
 ## 🔧 Performance Optimizations
 
-| Optimization | Before | After |
-|---|---|---|
-| Draw calls | **45** (21 spheres + 24 cylinders) | **2** (InstancedMesh) |
-| Allocations in hot path | `new Vector3()` every frame | **zero** (pre-allocated scratch objects) |
-| MediaPipe resolution | 640×480 | **320×240** (4× fewer pixels) |
-| MediaPipe model | complexity=1 | **complexity=0** (lite, ~2× faster) |
-| Renderer | ACESFilmic, antialias on, PR=device | **NoToneMapping, antialias off, PR≤1.5** |
-| CSS | `backdrop-filter: blur()` everywhere | **removed** (GPU expensive) |
-| DOM updates | Every frame | **Throttled every 8 frames** |
-| Tone mapping | ACESFilmic | **None** (saves shader overhead) |
+| Optimization            | Before                               | After                                    |
+| ----------------------- | ------------------------------------ | ---------------------------------------- |
+| Draw calls              | **45** (21 spheres + 24 cylinders)   | **2** (InstancedMesh)                    |
+| Allocations in hot path | `new Vector3()` every frame          | **zero** (pre-allocated scratch objects) |
+| MediaPipe resolution    | 640×480                              | **320×240** (4× fewer pixels)            |
+| MediaPipe model         | complexity=1                         | **complexity=0** (lite, ~2× faster)      |
+| Renderer                | ACESFilmic, antialias on, PR=device  | **NoToneMapping, antialias off, PR≤1.5** |
+| CSS                     | `backdrop-filter: blur()` everywhere | **removed** (GPU expensive)              |
+| DOM updates             | Every frame                          | **Throttled every 8 frames**             |
+| Tone mapping            | ACESFilmic                           | **None** (saves shader overhead)         |
 
 **Result:** 9fps → **60fps** on typical hardware.
 
@@ -96,16 +96,20 @@ The **smoothing lerp** in the render loop bridges the gap — even at 20fps Medi
 Click **⚙ SETTINGS** to access:
 
 **Motion**
+
 - `Smoothing` — lerp alpha from `HIGH` (very smooth, slight lag) to `RAW` (instant, jittery)
 - `Scale` — hand size in 3D space
 
 **Visibility**
+
 - Toggle joints, bones, fingertip highlights, particles, camera feed independently
 
 **Effects**
+
 - Pulse animation, wireframe bones
 
 **Performance**
+
 - `MediaPipe Rate` — 5 to 30fps inference rate. Lower = faster render, higher = more responsive tracking
 
 ---
@@ -179,25 +183,27 @@ All keyframes use **LINEAR interpolation** — no Bezier overshoot on fast movem
 ```
 
 **Coordinate system:**
+
 ```
 Three.js (Y-up)     →    Blender (Z-up)
   X  (right)               X  (right)
   Y  (up)                  Z  (up)
   Z  (forward)            -Y  (forward)
 ```
+
 The import script handles this conversion automatically.
 
 ---
 
 ## 🛠 Tech Stack
 
-| | |
-|---|---|
-| **3D Rendering** | [Three.js r128](https://threejs.org/) — WebGL via `InstancedMesh` |
-| **Hand Tracking** | [MediaPipe Hands 0.4](https://google.github.io/mediapipe/solutions/hands) — 21 landmark model |
-| **Export** | [JSZip 3.10](https://stuk.github.io/jszip/) — client-side ZIP generation |
-| **Fonts** | [Share Tech Mono](https://fonts.google.com/specimen/Share+Tech+Mono) + [Rajdhani](https://fonts.google.com/specimen/Rajdhani) |
-| **Deploy** | GitHub Pages — zero config, free HTTPS |
+|                   |                                                                                                                               |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| **3D Rendering**  | [Three.js r128](https://threejs.org/) — WebGL via `InstancedMesh`                                                             |
+| **Hand Tracking** | [MediaPipe Hands 0.4](https://google.github.io/mediapipe/solutions/hands) — 21 landmark model                                 |
+| **Export**        | [JSZip 3.10](https://stuk.github.io/jszip/) — client-side ZIP generation                                                      |
+| **Fonts**         | [Share Tech Mono](https://fonts.google.com/specimen/Share+Tech+Mono) + [Rajdhani](https://fonts.google.com/specimen/Rajdhani) |
+| **Deploy**        | GitHub Pages — zero config, free HTTPS                                                                                        |
 
 **Zero build tools. Zero npm. Zero bundlers.** Pure HTML + vanilla JS.
 
@@ -252,9 +258,10 @@ python -m http.server # or just open index.html in Chrome
 ```
 
 **GitHub Pages:**
+
 1. Repo → **Settings → Pages**
 2. Source: `main` branch, `/ (root)`
-3. Save → live at `https://YOUR-USERNAME.github.io/hand-tracking/`
+3. Save → live at `https://alxandrb.github.io/Threejs-Hand-Tracker/`
 
 ---
 
@@ -270,6 +277,6 @@ This code may not be used, copied, modified, or distributed without explicit wri
 
 Made with `Three.js` + `MediaPipe` + one HTML file
 
-*Built for speed. Built for Blender. Built in the browser.*
+_Built for speed. Built for Blender. Built in the browser._
 
 </div>
